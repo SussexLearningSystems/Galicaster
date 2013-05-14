@@ -17,10 +17,13 @@
 
 import gtk
 import pango
+import requests
 import time
+import xml.etree.ElementTree as ET
 from galicaster.core import context
 from galicaster.classui import get_ui_path, get_image_path
 from galicaster.classui.elements.message_header import Header
+from galicaster.classui.metadata import ComboBoxEntryExt
 
 sussex_login_dialog = None
 hidden_time = 0
@@ -58,7 +61,6 @@ def check_timeout(dispatcher):
     global waiting_for_details
     now = int(time.time())
     status = context.get_state()
-    print waiting_for_details
     if (now - hidden_time >= timeout and status.area == 0 
         and not waiting_for_details and not status.is_recording):
         waiting_for_details = True
@@ -222,14 +224,16 @@ class EnterDetails(gtk.Widget):
         if parent != None:
             dialog.set_transient_for(parent.get_toplevel())
 
+        u = get_user_details(user)
         presenter = gui.get_object('xpresent')
-        presenter.set_text(user)
-        """
+        presenter.set_text(u['user_name'])
+        
+        self.module = ComboBoxEntryExt(self.par, u['modules'])
         table = gui.get_object('infobox')
+        table.attach(self.module,1,2,2,3,gtk.EXPAND|gtk.FILL,False,0,0)
+
         dialog.vbox.set_child_packing(table, True, True, int(self.hprop*25), gtk.PACK_END)    
         title = gui.get_object('title')
-        sl = gui.get_object('slabel')
-        cl = gui.get_object('clabel')
         talign = gui.get_object('table_align')
 
         modification = "bold "+str(int(k2*25))+"px"        
@@ -237,14 +241,11 @@ class EnterDetails(gtk.Widget):
         title.hide()
         talign.set_padding(int(k2*40),int(k2*40),0,0)
         mod2 = str(int(k1*35))+"px"        
-        sl.modify_font(pango.FontDescription(mod2))
-        cl.modify_font(pango.FontDescription(mod2))
 
 
-        self.fill_metadata(table, package)
         talign.set_padding(int(self.hprop*25), int(self.hprop*10), int(self.hprop*25), int(self.hprop*25))
         dialog.vbox.set_child_packing(dialog.action_area, True, True, int(self.hprop*25), gtk.PACK_END)   
-        """
+        
         dialog.show_all()
 
         return_value = dialog.run()
@@ -256,7 +257,52 @@ class EnterDetails(gtk.Widget):
         waiting_for_details = False
         dialog.destroy()
 
+def get_user_details(user=None):
+    """
+    look up user info/courses in web service
+    """
+    if user:
+        u = {}
+        try:
+            conf = context.get_conf()
+            ws = conf.get('sussexlogin', 'ws')
+            url = ws % user
+            logger.debug(url)
+        except:
+            logger.error('No web service url specified in config')
 
+        try:
+            r = requests.get(url)
+        except requests.exceptions.RequestException:
+            logger.error('Error getting data from web service')
+        
+#         try:
+        xml = ET.fromstring(r.text)
+        sub = xml.find('subtitle').text.split('/')
+        u['user_id'] = user
+        u['user_name'] = sub[0].strip()
+        u['person_id'] = sub[1].strip()
+        u['pic_flag'] = int(sub[2].strip())
+    
+        u['modules'] = {}
+        for row in xml.findall('row'):
+            for field in row.findall('field'):
+                if field.find('name').text == 'module':
+                    mod_name = field.find('value').text
+                if field.find('name').text == 'course_code':
+                    mod_code = field.find('value').text
+                if field.find('name').text == 'occurrence_code':
+                    mod_occ = field.find('value').text
+            mod_fullcode = mod_code + '__' + mod_occ
+            u['modules'][mod_fullcode] = {'title': mod_name}
+            
+#         except Exception as e:
+#             print e
+#             logger.error('Looks like the web service XML is broken (or user name is invalid)')
+
+
+        return u
+        
 
 def notify(*args, **kwargs):
     print args, kwargs
