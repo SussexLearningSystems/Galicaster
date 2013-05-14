@@ -17,12 +17,16 @@
 
 import gtk
 import pango
+import time
 from galicaster.core import context
 from galicaster.classui import get_ui_path, get_image_path
 from galicaster.classui.elements.message_header import Header
 
 sussex_login_dialog = None
-focus_is_active = True
+hidden_time = 0
+
+#default 5 mins
+timeout = 300
 
 logger = context.get_logger()
 
@@ -32,25 +36,44 @@ def init():
         dispatcher.connect('galicaster-status', event_change_mode)
         dispatcher.connect('stop-record', show_login)
         dispatcher.connect('restart-preview', show_login)
+        dispatcher.connect('galicaster-notify-timer-short', check_timeout)
         
     except ValueError:
         pass
+    
+    try:
+        global timeout
+        conf = context.get_conf()
+        timeout = int(conf.get('sussexlogin', 'timeout'))
+    except ValueError:
+        #use default
+        pass
+    logger.info("timeout set to: %d", timeout)
+    
+def check_timeout(dispatcher):
+    """
+    Pop up login dialog if timeout has elapsed and no recording is in progress
+    """ 
+    now = int(time.time())
+    status = context.get_state()
+    if now - hidden_time >= timeout and status.area == 0:
+        show_login()
+
 
 def event_change_mode(orig, old_state, new_state):
     """
     On changing mode, if the new area is right, shows dialog if necessary
     """
     global sussex_login_dialog
-    global focus_is_active
+    global hidden_time
     status = context.get_state().get_all()
     
     if new_state == 0: 
-        focus_is_active = True
         if not status['is-recording']:
             show_login()
 
     if old_state == 0:
-        focus_is_active = False
+        hidden_time = int(time.time())
         sussex_login_dialog.hide()
 
 def show_login(element=None):
@@ -58,14 +81,20 @@ def show_login(element=None):
     Called up when switching to record mode or recording ended, shows the dialog if necessary
     """
     global sussex_login_dialog
-    global focus_is_active
-    if focus_is_active:
-        if sussex_login_dialog:
-            pass
-        else:
-            sussex_login_dialog = create_ui()
-        sussex_login_dialog.show() 
+    if sussex_login_dialog:
+        pass
+    else:
+        sussex_login_dialog = create_ui()
+    sussex_login_dialog.show() 
     return True
+
+def do_login(button):
+    """
+    Called when you press the login button
+    """
+    global hidden_time
+    hidden_time = int(time.time())
+    sussex_login_dialog.hide()
 
 def create_ui():
     """
@@ -94,7 +123,7 @@ def create_ui():
     #Buttons
     conf = context.get_conf()
     login_button = ui.add_button("Log In",2)
-    login_button.connect("clicked",lambda l:ui.hide())
+    login_button.connect("clicked", do_login)
     for child in ui.action_area.get_children():
         child.set_property("width-request", int(wprop*170) )
         child.set_property("height-request", int(hprop*70) )
