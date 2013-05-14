@@ -56,7 +56,7 @@ def check_timeout(dispatcher):
     """ 
     now = int(time.time())
     status = context.get_state()
-    if now - hidden_time >= timeout and status.area == 0:
+    if now - hidden_time >= timeout and status.area == 0 and not status.is_recording:
         show_login()
 
 
