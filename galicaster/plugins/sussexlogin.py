@@ -23,8 +23,8 @@ import xml.etree.ElementTree as ET
 from galicaster.core import context
 from galicaster.classui import get_ui_path, get_image_path
 from galicaster.classui.elements.message_header import Header
-from galicaster.classui.metadata import ComboBoxEntryExt
 from galicaster.mediapackage.mediapackage import Mediapackage
+from operator import itemgetter
 
 sussex_login_dialog = None
 hidden_time = 0
@@ -34,6 +34,7 @@ waiting_for_details = False
 timeout = 300
 
 logger = context.get_logger()
+conf = context.get_conf()
 
 def init():
     try:
@@ -48,9 +49,8 @@ def init():
     
     try:
         global timeout
-        conf = context.get_conf()
         timeout = int(conf.get('sussexlogin', 'timeout'))
-    except ValueError:
+    except:
         #use default
         pass
     logger.info("timeout set to: %d", timeout)
@@ -234,7 +234,19 @@ class EnterDetails(gtk.Widget):
             photo = gui.get_object('xphoto')
             photo.set_from_pixbuf(u['pic'])
         
-        self.module = ComboBoxEntryExt(self.par, u['modules'], '')
+        liststore = liststore = gtk.ListStore(str,str)
+        liststore.append(['', ''])
+        if u['modules']:
+            #sort modules by name before adding to liststore
+            for series_id, series_name in sorted(u['modules'].items(), key=itemgetter(1)):
+                liststore.append([series_name, series_id])
+
+        cell = gtk.CellRendererText()
+        
+        self.module = gtk.ComboBox(liststore)
+        self.module.pack_start(cell, True)
+        self.module.add_attribute(cell, 'text', 0)
+
         table = gui.get_object('infobox')
         table.attach(self.module,1,2,2,3,gtk.EXPAND|gtk.FILL,False,0,0)
 
@@ -256,7 +268,10 @@ class EnterDetails(gtk.Widget):
 
         return_value = dialog.run()
         if return_value == -8:
-            start_recording(u, gui.get_object('xtitle').get_text())
+            iter = self.module.get_active_iter()
+            mod = liststore.get(iter, 0, 1)
+            name = gui.get_object('xtitle').get_text()
+            start_recording(u, name, mod)
 
         hidden_time = int(time.time())
         waiting_for_details = False
@@ -269,7 +284,6 @@ def get_user_details(user=None):
     if user:
         u = {}
         try:
-            conf = context.get_conf()
             ws = conf.get('sussexlogin', 'ws')
             pic_urls = conf.get('sussexlogin', 'pic_urls').split('|')
             url = ws % user
@@ -308,20 +322,27 @@ def get_user_details(user=None):
                 for field in row.findall('field'):
                     row_temp[field.find('name').text] = field.find('value').text
                 mod_fullcode = row_temp['course_code'] + '__' + row_temp['occurrence_code']
-                u['modules'][mod_fullcode] = {'title': row_temp['module']}
+                u['modules'][mod_fullcode] = row_temp['module']
             
         except Exception as e:
              logger.error('Looks like the web service XML is broken (or user name is invalid)')
 
         return u
         
-def start_recording(user, title):
+def start_recording(user, title, module):
     """
     start a recording by adding a mediapackage to the repo with the correct metadata
     then emitting a 'start-before' signal.
     """
     repo = context.get_repository()
     mp = Mediapackage(title=title, presenter=user['user_name'])
+    series = {'title': module[0], 'identifier': module[1]}
+    try:
+        pub = conf.get('sussexlogin', 'publisher')
+        series['publisher'] = pub
+    except ValueError:
+        logger.info('No publisher specified in config file')
+    mp.setSeries(series)
     repo.add(mp)
     context.get_dispatcher().emit('start-before', mp.getIdentifier())
 
