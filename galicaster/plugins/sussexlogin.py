@@ -228,7 +228,7 @@ class EnterDetails(gtk.Widget):
         presenter = gui.get_object('xpresent')
         presenter.set_text(u['user_name'])
         
-        self.module = ComboBoxEntryExt(self.par, u['modules'])
+        self.module = ComboBoxEntryExt(self.par, u['modules'], '')
         table = gui.get_object('infobox')
         table.attach(self.module,1,2,2,3,gtk.EXPAND|gtk.FILL,False,0,0)
 
