@@ -225,8 +225,13 @@ class EnterDetails(gtk.Widget):
             dialog.set_transient_for(parent.get_toplevel())
 
         u = get_user_details(user)
+        
         presenter = gui.get_object('xpresent')
         presenter.set_text(u['user_name'])
+        
+        if u['pic']:
+            photo = gui.get_object('xphoto')
+            photo.set_from_pixbuf(u['pic'])
         
         self.module = ComboBoxEntryExt(self.par, u['modules'], '')
         table = gui.get_object('infobox')
@@ -266,6 +271,7 @@ def get_user_details(user=None):
         try:
             conf = context.get_conf()
             ws = conf.get('sussexlogin', 'ws')
+            pic_urls = conf.get('sussexlogin', 'pic_urls').split('|')
             url = ws % user
             logger.debug(url)
         except:
@@ -283,6 +289,18 @@ def get_user_details(user=None):
             u['user_name'] = sub[0].strip()
             u['person_id'] = sub[1].strip()
             u['pic_flag'] = int(sub[2].strip())
+            u['pic'] = None
+
+            if not u['pic_flag']:
+                for pic_url in pic_urls:
+                    logger.debug(pic_url % u['person_id'])
+                    r = requests.get(pic_url % u['person_id'])
+                    if r.status_code == 200:
+                        loader = gtk.gdk.PixbufLoader()
+                        loader.write(r.content)
+                        loader.close()
+                        u['pic'] = loader.get_pixbuf()
+                        break
         
             u['modules'] = {}
             for row in xml.findall('row'):
