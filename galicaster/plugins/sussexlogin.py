@@ -24,6 +24,7 @@ from galicaster.core import context
 from galicaster.classui import get_ui_path, get_image_path
 from galicaster.classui.elements.message_header import Header
 from galicaster.classui.metadata import ComboBoxEntryExt
+from galicaster.mediapackage.mediapackage import Mediapackage
 
 sussex_login_dialog = None
 hidden_time = 0
@@ -255,8 +256,7 @@ class EnterDetails(gtk.Widget):
 
         return_value = dialog.run()
         if return_value == -8:
-            pass
-            #self.update_metadata(table,package)
+            start_recording(u, gui.get_object('xtitle').get_text())
 
         hidden_time = int(time.time())
         waiting_for_details = False
@@ -315,6 +315,16 @@ def get_user_details(user=None):
 
         return u
         
+def start_recording(user, title):
+    """
+    start a recording by adding a mediapackage to the repo with the correct metadata
+    then emitting a 'start-before' signal.
+    """
+    repo = context.get_repository()
+    mp = Mediapackage(title=title, presenter=user['user_name'])
+    repo.add(mp)
+    context.get_dispatcher().emit('start-before', mp.getIdentifier())
+
 
 def notify(*args, **kwargs):
     print args, kwargs
