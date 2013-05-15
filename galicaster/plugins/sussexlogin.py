@@ -276,30 +276,24 @@ def get_user_details(user=None):
         except requests.exceptions.RequestException:
             logger.error('Error getting data from web service')
         
-#         try:
-        xml = ET.fromstring(r.text)
-        sub = xml.find('subtitle').text.split('/')
-        u['user_id'] = user
-        u['user_name'] = sub[0].strip()
-        u['person_id'] = sub[1].strip()
-        u['pic_flag'] = int(sub[2].strip())
-    
-        u['modules'] = {}
-        for row in xml.findall('row'):
-            for field in row.findall('field'):
-                if field.find('name').text == 'module':
-                    mod_name = field.find('value').text
-                if field.find('name').text == 'course_code':
-                    mod_code = field.find('value').text
-                if field.find('name').text == 'occurrence_code':
-                    mod_occ = field.find('value').text
-            mod_fullcode = mod_code + '__' + mod_occ
-            u['modules'][mod_fullcode] = {'title': mod_name}
+        try:
+            xml = ET.fromstring(r.text)
+            sub = xml.find('subtitle').text.split('/')
+            u['user_id'] = user
+            u['user_name'] = sub[0].strip()
+            u['person_id'] = sub[1].strip()
+            u['pic_flag'] = int(sub[2].strip())
+        
+            u['modules'] = {}
+            for row in xml.findall('row'):
+                row_temp = {}
+                for field in row.findall('field'):
+                    row_temp[field.find('name').text] = field.find('value').text
+                mod_fullcode = row_temp['course_code'] + '__' + row_temp['occurrence_code']
+                u['modules'][mod_fullcode] = {'title': row_temp['module']}
             
-#         except Exception as e:
-#             print e
-#             logger.error('Looks like the web service XML is broken (or user name is invalid)')
-
+        except Exception as e:
+             logger.error('Looks like the web service XML is broken (or user name is invalid)')
 
         return u
         
