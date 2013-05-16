@@ -1,16 +1,25 @@
-# -*- coding:utf-8 -*-
-# Galicaster, Multistream Recorder and Player
+# sussexlogin galicaster plugin
 #
-#       galicaster/plugins/sussexlogin
-#
-# Copyright (c) 2013, Teltek Video Research <galicaster@teltek.es>
-#
-# This work is licensed under the Creative Commons Attribution-
-# NonCommercial-ShareAlike 3.0 Unported License. To view a copy of 
-# this license, visit http://creativecommons.org/licenses/by-nc-sa/3.0/ 
-# or send a letter to Creative Commons, 171 Second Street, Suite 300, 
-# San Francisco, California, 94105, USA.
-
+# Copyright 2013 University of Sussex
+# 
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+# 
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
 """
@@ -30,13 +39,18 @@ sussex_login_dialog = None
 hidden_time = 0
 waiting_for_details = False
 
-#default 5 mins
-timeout = 300
+#defaults 
+timeout = 300 #5 mins
+cam_profile = 'cam'
+nocam_profile = 'nocam'
 
 logger = context.get_logger()
 conf = context.get_conf()
 
 def init():
+    global timeout
+    global cam_profile
+    global nocam_profile
     try:
         dispatcher = context.get_dispatcher()
         dispatcher.connect('galicaster-status', event_change_mode)
@@ -47,13 +61,14 @@ def init():
     except ValueError:
         pass
     
-    try:
-        global timeout
-        timeout = int(conf.get('sussexlogin', 'timeout'))
-    except:
-        #use default
-        pass
+    timeout = int(conf.get('sussexlogin', 'timeout')) or timeout
     logger.info("timeout set to: %d", timeout)
+    
+    cam_profile = conf.get('sussexlogin', 'cam_profile') or cam_profile
+    logger.info("cam_profile set to: %s", cam_profile)
+        
+    nocam_profile = conf.get('sussexlogin', 'nocam_profile') or nocam_profile
+    logger.info("nocam_profile set to: %s", nocam_profile)
     
 def check_timeout(dispatcher):
     """
@@ -226,21 +241,21 @@ class EnterDetails(gtk.Widget):
             dialog.set_transient_for(parent.get_toplevel())
 
         u = get_user_details(user)
-        
-        presenter = gui.get_object('xpresent')
-        presenter.set_text(u['user_name'])
-        
-        if u['pic']:
-            photo = gui.get_object('xphoto')
-            photo.set_from_pixbuf(u['pic'])
-        
         liststore = liststore = gtk.ListStore(str,str)
         liststore.append(['', ''])
-        if u['modules']:
-            #sort modules by name before adding to liststore
-            for series_id, series_name in sorted(u['modules'].items(), key=itemgetter(1)):
-                liststore.append([series_name, series_id])
-
+        if u:
+            presenter = gui.get_object('xpresent')
+            presenter.set_text(u['user_name'])
+            
+            if u['pic']:
+                photo = gui.get_object('xphoto')
+                photo.set_from_pixbuf(u['pic'])
+            
+            if u['modules']:
+                #sort modules by name before adding to liststore
+                for series_id, series_name in sorted(u['modules'].items(), key=itemgetter(1)):
+                    liststore.append([series_name, series_id])
+    
         cell = gtk.CellRendererText()
         
         self.module = gtk.ComboBox(liststore)
@@ -268,10 +283,14 @@ class EnterDetails(gtk.Widget):
 
         return_value = dialog.run()
         if return_value == -8:
+            mod = None
             iter = self.module.get_active_iter()
-            mod = liststore.get(iter, 0, 1)
+            if iter:
+                mod = liststore.get(iter, 0, 1)
             name = gui.get_object('xtitle').get_text()
-            start_recording(u, name, mod)
+            cam = gui.get_object('xcamera').get_active()
+            profile = cam_profile if cam else nocam_profile
+            start_recording(u, name, mod, profile)
 
         hidden_time = int(time.time())
         waiting_for_details = False
@@ -329,24 +348,31 @@ def get_user_details(user=None):
 
         return u
         
-def start_recording(user, title, module):
+def start_recording(user, title, module, profile):
     """
     start a recording by adding a mediapackage to the repo with the correct metadata
     then emitting a 'start-before' signal.
     """
     repo = context.get_repository()
-    mp = Mediapackage(title=title, presenter=user['user_name'])
-    series = {'title': module[0], 'identifier': module[1]}
-    try:
-        pub = conf.get('sussexlogin', 'publisher')
-        series['publisher'] = pub
-    except ValueError:
-        logger.info('No publisher specified in config file')
-    mp.setSeries(series)
+    if user:
+        pres = user['user_name']
+    else:
+        pres = ''
+    mp = Mediapackage(title=title, presenter=pres)
+    if module:
+        series = {'title': module[0], 'identifier': module[1]}
+        try:
+            pub = conf.get('sussexlogin', 'publisher')
+            series['publisher'] = pub
+        except ValueError:
+            logger.info('No publisher specified in config file')
+        mp.setSeries(series)
+        
     repo.add(mp)
-    context.get_dispatcher().emit('start-before', mp.getIdentifier())
 
+    conf.change_current_profile(profile)
+    conf.update()
+    dispatcher = context.get_dispatcher()
+    dispatcher.emit('reload-profile')
+    dispatcher.emit('start-before', mp.getIdentifier())
 
-def notify(*args, **kwargs):
-    print args, kwargs
-    print context.get_state().get_all()
