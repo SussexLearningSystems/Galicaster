@@ -356,18 +356,19 @@ def start_recording(user, title, module, profile):
     repo = context.get_repository()
     if user:
         pres = user['user_name']
+        user_id = user['user_id']
     else:
         pres = ''
+        user_id = ''
     mp = Mediapackage(title=title, presenter=pres)
+    mp.setMetadataByName('rightsHolder', user_id)
     if module:
         series = {'title': module[0], 'identifier': module[1]}
-        try:
-            pub = conf.get('sussexlogin', 'publisher')
-            series['publisher'] = pub
-        except ValueError:
-            logger.info('No publisher specified in config file')
+        pub = conf.get('sussexlogin', 'publisher')
+        series['publisher'] = pub
         mp.setSeries(series)
-        
+    room = conf.get('sussexlogin', 'room_name')
+    mp.setMetadataByName('spatial', room)
     repo.add(mp)
 
     conf.change_current_profile(profile)
