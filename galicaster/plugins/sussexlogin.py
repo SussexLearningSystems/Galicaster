@@ -104,12 +104,13 @@ def show_login(element=None):
     """
     global sussex_login_dialog
     global waiting_for_details
-    if sussex_login_dialog:
-        pass
-    else:
-        sussex_login_dialog = LoginDialog()
-    waiting_for_details = True
-    sussex_login_dialog.show() 
+    if not context.get_state().is_recording and not waiting_for_details:
+        if sussex_login_dialog:
+            pass
+        else:
+            sussex_login_dialog = LoginDialog()
+        waiting_for_details = True
+        sussex_login_dialog.show() 
     return True
 
    
