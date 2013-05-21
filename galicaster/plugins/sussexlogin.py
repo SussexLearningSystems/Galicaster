@@ -24,6 +24,7 @@
 
 """
 
+import gst
 import gtk
 import pango
 import requests
@@ -38,6 +39,7 @@ from operator import itemgetter
 sussex_login_dialog = None
 hidden_time = 0
 waiting_for_details = False
+trigger_recording = None
 
 #defaults 
 timeout = 300 #5 mins
@@ -57,6 +59,7 @@ def init():
         dispatcher.connect('stop-record', show_login)
         dispatcher.connect('restart-preview', show_login)
         dispatcher.connect('galicaster-notify-timer-short', check_timeout)
+        dispatcher.connect('update-pipeline-status', on_update_pipeline)
         
     except ValueError:
         pass
@@ -354,6 +357,7 @@ def start_recording(user, title, module, profile):
     start a recording by adding a mediapackage to the repo with the correct metadata
     then emitting a 'start-before' signal.
     """
+    global trigger_recording
     repo = context.get_repository()
     if user:
         pres = user['user_name']
@@ -376,5 +380,10 @@ def start_recording(user, title, module, profile):
     conf.update()
     dispatcher = context.get_dispatcher()
     dispatcher.emit('reload-profile')
-    dispatcher.emit('start-before', mp.getIdentifier())
-
+    trigger_recording = mp.getIdentifier()
+    
+def on_update_pipeline(source, old, new):
+    global trigger_recording
+    if trigger_recording and (old, new) == (gst.STATE_PAUSED, gst.STATE_PLAYING):
+        context.get_dispatcher().emit('start-before', trigger_recording)
+        trigger_recording = None
