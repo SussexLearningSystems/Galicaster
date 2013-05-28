@@ -56,9 +56,7 @@ def init():
     try:
         dispatcher = context.get_dispatcher()
         dispatcher.connect('galicaster-status', event_change_mode)
-        dispatcher.connect('stop-record', show_login)
         dispatcher.connect('restart-preview', show_login)
-        dispatcher.connect('galicaster-notify-timer-short', check_timeout)
         dispatcher.connect('update-pipeline-status', on_update_pipeline)
         
     except ValueError:
@@ -73,28 +71,15 @@ def init():
     nocam_profile = conf.get('sussexlogin', 'nocam_profile') or nocam_profile
     logger.info("nocam_profile set to: %s", nocam_profile)
     
-def check_timeout(dispatcher):
-    """
-    Pop up login dialog if timeout has elapsed and no recording is in progress
-    """ 
-    global waiting_for_details
-    now = int(time.time())
-    status = context.get_state()
-    if (now - hidden_time >= timeout and status.area == 0 
-        and not waiting_for_details and not status.is_recording):
-        waiting_for_details = True
-        show_login()
-
 
 def event_change_mode(orig, old_state, new_state):
     """
     On changing mode, if the new area is right, shows dialog if necessary
     """
     global sussex_login_dialog
-    status = context.get_state().get_all()
     
     if new_state == 0: 
-        if not status['is-recording']:
+        if not context.get_state().is_recording:
             show_login()
 
     if old_state == 0:
@@ -387,3 +372,4 @@ def on_update_pipeline(source, old, new):
     if trigger_recording and (old, new) == (gst.STATE_PAUSED, gst.STATE_PLAYING):
         context.get_dispatcher().emit('start-before', trigger_recording)
         trigger_recording = None
+
