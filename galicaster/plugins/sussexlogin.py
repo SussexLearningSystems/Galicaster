@@ -36,15 +36,17 @@ from galicaster.classui.elements.message_header import Header
 from galicaster.mediapackage.mediapackage import Mediapackage
 from operator import itemgetter
 
-sussex_login_dialog = None
-hidden_time = 0
-waiting_for_details = False
-trigger_recording = None
-
 #defaults 
-timeout = 300 #5 mins
 cam_profile = 'cam'
 nocam_profile = 'nocam'
+
+fsize = 50
+sussex_login_dialog = None
+waiting_for_details = False
+trigger_recording = None
+switching_profile = False
+profile = nocam_profile
+ed = None
 
 logger = context.get_logger()
 conf = context.get_conf()
@@ -61,9 +63,6 @@ def init():
         
     except ValueError:
         pass
-    
-    timeout = int(conf.get('sussexlogin', 'timeout')) or timeout
-    logger.info("timeout set to: %d", timeout)
     
     cam_profile = conf.get('sussexlogin', 'cam_profile') or cam_profile
     logger.info("cam_profile set to: %s", cam_profile)
@@ -98,6 +97,7 @@ def show_login(element=None):
         else:
             sussex_login_dialog = LoginDialog()
         waiting_for_details = True
+        sussex_login_dialog.login.set_text('')
         sussex_login_dialog.show() 
     return True
 
@@ -110,14 +110,12 @@ class LoginDialog(gtk.Dialog):
         parent = context.get_mainwindow().get_toplevel()
         super(LoginDialog, self).__init__("Log In", parent)
         
-    
         #Properties
         self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_TOOLBAR)
         self.set_skip_taskbar_hint(True)
         self.set_modal(True)
         self.set_accept_focus(True)
         self.set_destroy_with_parent(True)
-    
     
         size = parent.get_size()
         self.set_property('width-request',int(size[0]/3)) 
@@ -128,8 +126,13 @@ class LoginDialog(gtk.Dialog):
         self.set_position(gtk.WIN_POS_CENTER_ON_PARENT)
         self.action_area.set_layout(gtk.BUTTONBOX_SPREAD)
     
+        font = "%dpx" % (hprop * fsize)
+        fdesc = pango.FontDescription(font)
+        attr = set_font(font)
+
         #Buttons
         login_button = self.add_button("Log In",2)
+        login_button.child.set_attributes(attr)
         login_button.connect("clicked", self.do_login)
         for child in self.action_area.get_children():
             child.set_property("width-request", int(wprop*170) )
@@ -143,24 +146,27 @@ class LoginDialog(gtk.Dialog):
     
         #Labels
         label1 = gtk.Label("Username:")
-        self.login = gtk.Entry()
-        self.login.set_editable(gtk.TRUE)
-        self.login.set_can_focus(gtk.TRUE)
-        self.login.set_activates_default(gtk.TRUE)
-        self.login.activate()
-        desc1 = str(int(hprop*32))+"px"
-        font1=pango.FontDescription(desc1)
-        label1.modify_font(font1)
+        label1.modify_font(fdesc)
         label1.set_alignment(0.5,0.5)
+
+        login = gtk.Entry()
+        login.set_editable(gtk.TRUE)
+        login.set_can_focus(gtk.TRUE)
+        login.set_activates_default(gtk.TRUE)
+        login.set_text('')
+        login.activate()
+        login.modify_font(fdesc)
+        self.login = login
+        
         # Warning icon
         box = gtk.HBox(spacing=0) # between image and text
-        box.pack_start(label1,True,True,0)  
-        box.pack_start(self.login,True,True,0)  
+        box.pack_start(label1, True, True, 0)  
+        box.pack_start(self.login, True, True, 0)  
         box.show()
+
         self.action_area.set_property('spacing',int(hprop*20))
         self.vbox.pack_start(box, True, False, 0)
-        #ui.vbox.pack_start(label2, True, False, 0)
-        resize_buttons(self.action_area,int(wprop*25),True)
+
         self.vbox.set_child_packing(self.action_area, True, True, int(hprop*25), gtk.PACK_END)
         self.login.show()
         label1.show()
@@ -169,8 +175,9 @@ class LoginDialog(gtk.Dialog):
         """
         Called when you press the login button
         """
+        global ed
         self.hide()
-        EnterDetails(self.login.get_text())
+        ed = EnterDetails(self.login.get_text())
         
 
 def set_font(description):
@@ -181,109 +188,141 @@ def set_font(description):
         alist.insert(attr)
         return alist
 
-def resize_buttons(area, fsize, equal = False):    
-        """Adapts buttons to the dialog size"""
-        font = set_font("bold "+str(fsize)+"px")
-        for button in area.get_children():
-            for element in button.get_children():
-                if type(element) == gtk.Label:
-                    element.set_attributes(font)
-                    if equal:
-                        element.set_padding(-1,int(fsize/2.6))
-
-class EnterDetails(gtk.Widget):
+class EnterDetails(gtk.Window):
     """
     Handle enter details dialog
     """
     __gtype_name__ = 'EnterDetails'
 
-    def __init__(self, user=""):
-        global hidden_time
+    def __init__(self, user=''):
+        gtk.Window.__init__(self)
         global waiting_for_details
 
         parent = context.get_mainwindow()
-        size = parent.get_size()
             
         self.par = parent
-        altura = size[1]
-        anchura = size[0]        
-        k1 = anchura / 1920.0                                      
-        k2 = altura / 1080.0
-        self.wprop = k1
-        self.hprop = k2
+        width, height = parent.get_size()
+        self.wprop = width / 1920.0                                      
+        self.hprop = height / 1080.0
+        
+        font = '%dpx' % (self.wprop * fsize)
+        fdesc = pango.FontDescription(font)
+        attr = set_font(font)
 
-        gui = gtk.Builder()
-        gui.add_from_file(get_ui_path('enterdetails.glade'))
+        self.set_property("width-request", width)
+        self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_TOOLBAR)
+        self.set_keep_above(True)
+        self.set_position(gtk.WIN_POS_NONE)
+        self.set_modal(True)
 
-        dialog = gui.get_object("enterdetailsdialog")
-        dialog.set_property("width-request",int(anchura/2.2))
-        dialog.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_TOOLBAR)
-        dialog.set_keep_above(True)
+        vbox = gtk.VBox()
+        vbox2 = gtk.VBox()
+        hbox = gtk.HBox()
+        hbox2 = gtk.HBox()
+        hbox3 = gtk.HBox()
 
-        #NEW HEADER
-        strip = Header(size=size, title="Edit Metadata")
-        dialog.vbox.pack_start(strip, True, True, 0)
-        dialog.vbox.reorder_child(strip,0)
-
-
-        if parent != None:
-            dialog.set_transient_for(parent.get_toplevel())
-
-        u = get_user_details(user)
         liststore = liststore = gtk.ListStore(str,str)
-        liststore.append(['', ''])
+        self.liststore = liststore
+        liststore.append(['Choose a Module...', ''])
+        presenter = "Enter Details"
+        photo = gtk.Image()
+        
+        self.u = None 
+        u = get_user_details(user)
         if u:
-            presenter = gui.get_object('xpresent')
-            presenter.set_text(u['user_name'])
-            
+            self.u = u
+            presenter = u['user_name']
+             
             if u['pic']:
-                photo = gui.get_object('xphoto')
                 photo.set_from_pixbuf(u['pic'])
-            
+             
             if u['modules']:
                 #sort modules by name before adding to liststore
                 for series_id, series_name in sorted(u['modules'].items(), key=itemgetter(1)):
                     liststore.append([series_name, series_id])
-    
+ 
+        strip = Header(size=(width, height), title=presenter)
+        vbox.pack_start(strip, True, True, 0)
+
         cell = gtk.CellRendererText()
-        
+        cell.set_property('font-desc', fdesc)
         self.module = gtk.ComboBox(liststore)
         self.module.pack_start(cell, True)
         self.module.add_attribute(cell, 'text', 0)
+        self.module.set_active(0)
 
-        table = gui.get_object('infobox')
-        table.attach(self.module,1,2,2,3,gtk.EXPAND|gtk.FILL,False,0,0)
-
-        dialog.vbox.set_child_packing(table, True, True, int(self.hprop*25), gtk.PACK_END)    
-        title = gui.get_object('title')
-        talign = gui.get_object('table_align')
-
-        modification = "bold "+str(int(k2*25))+"px"        
-        title.modify_font(pango.FontDescription(modification))
-        title.hide()
-        talign.set_padding(int(k2*40),int(k2*40),0,0)
-        mod2 = str(int(k1*35))+"px"        
-
-
-        talign.set_padding(int(self.hprop*25), int(self.hprop*10), int(self.hprop*25), int(self.hprop*25))
-        dialog.vbox.set_child_packing(dialog.action_area, True, True, int(self.hprop*25), gtk.PACK_END)   
+        title = PlaceholderEntry(placeholder='Enter a title here...')
+        title.modify_font(fdesc)
+        self.t = title
         
-        dialog.show_all()
+        cam = gtk.CheckButton(label='Camera')
+        cam.connect('clicked', self._toggled)
+        cam.child.set_attributes(attr)
+        self.cam = cam
+        
+        rec_image = gtk.Image()
+        icon = gtk.icon_theme_get_default().load_icon('media-record', 
+                                                      int(fsize * 1.5), 
+                                                      gtk.ICON_LOOKUP_FORCE_SVG)
+        rec_image.set_from_pixbuf(icon)
+        rec_image.set_alignment(1.0, 0.5)
+        rec_image.show()
+        rec_label = gtk.Label('Record')
+        rec_label.set_alignment(0, 0.5)
+        rec_label.set_attributes(attr)
+        rec_hbox = gtk.HBox()
+        rec_hbox.pack_start(rec_image)
+        rec_hbox.pack_start(rec_label)
+        
+        record = gtk.Button()
+        record.connect('clicked', self.do_record)
+        record.add(rec_hbox)
+        
+        cancel = gtk.Button(label='Cancel')
+        cancel.connect('clicked', self.do_cancel)
+        cancel.child.set_attributes(attr)
+        cancel.child.set_padding(-1, int(fsize / 2.5))
 
-        return_value = dialog.run()
-        if return_value == -8:
-            mod = None
-            iter = self.module.get_active_iter()
-            if iter:
-                mod = liststore.get(iter, 0, 1)
-            name = gui.get_object('xtitle').get_text()
-            cam = gui.get_object('xcamera').get_active()
-            profile = cam_profile if cam else nocam_profile
-            start_recording(u, name, mod, profile)
+        hbox2.pack_start(title)
+        hbox2.pack_start(cam, False, False, 5)
+        hbox3.pack_start(record, padding=5)
+        hbox3.pack_start(cancel, padding=5)
+        vbox2.pack_start(self.module)
+        vbox2.pack_start(hbox2, padding=5)
+        vbox2.pack_start(hbox3, padding=5)
+        hbox.pack_start(photo, False, False, 5)
+        hbox.pack_start(vbox2)
+        
+        vbox.add(hbox)
+        self.add(vbox)
+        self.set_transient_for(parent)
+        self.show_all()
+        switch_profile(nocam_profile)
 
-        hidden_time = int(time.time())
+    def _toggled(self, widget):
+        use_cam = widget.get_active()
+        profile = cam_profile if use_cam else nocam_profile
+        switch_profile(profile)
+        
+    def do_record(self, button):
+        global waiting_for_details
+        mod = None
+        iter = self.module.get_active_iter()
+        if iter:
+            mod = self.liststore.get(iter, 0, 1)
+        name = self.t.get_text() or 'Unknown'
+        cam = self.cam.get_active()
+        profile = cam_profile if cam else nocam_profile
+        start_recording(self.u, name, mod, profile)
+
         waiting_for_details = False
-        dialog.destroy()
+        self.destroy()
+
+    def do_cancel(self, button):
+        global waiting_for_details
+        waiting_for_details = False
+        self.destroy()
+
 
 def get_user_details(user=None):
     """
@@ -360,16 +399,72 @@ def start_recording(user, title, module, profile):
     room = conf.get('sussexlogin', 'room_name')
     mp.setMetadataByName('spatial', room)
     repo.add(mp)
-
-    conf.change_current_profile(profile)
-    conf.update()
-    dispatcher = context.get_dispatcher()
-    dispatcher.emit('reload-profile')
+    switch_profile(profile)
     trigger_recording = mp.getIdentifier()
+
+def switch_profile(profile):
+    global switching_profile
+    if not switching_profile:
+        switching_profile = True
+        conf.change_current_profile(profile)
+        conf.update()
+        dispatcher = context.get_dispatcher()
+        dispatcher.emit('reload-profile')
     
 def on_update_pipeline(source, old, new):
-    global trigger_recording
-    if trigger_recording and (old, new) == (gst.STATE_PAUSED, gst.STATE_PLAYING):
-        context.get_dispatcher().emit('start-before', trigger_recording)
-        trigger_recording = None
+    global trigger_recording, switching_profile, profile
+    playing = (old, new) == (gst.STATE_PAUSED, gst.STATE_PLAYING)
+    if playing:
+        if trigger_recording:
+            context.get_dispatcher().emit('start-before', trigger_recording)
+            trigger_recording = None
+        time.sleep(0.5)
+        
+        profile = conf.get('basic','profile')
+        if ed:
+            ed.cam.set_active(profile == cam_profile)
+        switching_profile = False
 
+class PlaceholderEntry(gtk.Entry):
+
+    placeholder = 'Username'
+    _default = True
+
+    def __init__(self, *args, **kwargs):
+        self.placeholder = kwargs['placeholder']
+        del kwargs['placeholder'] 
+        gtk.Entry.__init__(self, *args, **kwargs)
+        self.connect('focus-in-event', self._focus_in_event)
+        self.connect('focus-out-event', self._focus_out_event)
+        self._focus_out_event(self, None)
+
+    def _focus_in_event(self, widget, event):
+        if self._default:
+            self.set_text('')
+            self.modify_text(gtk.STATE_NORMAL, gtk.gdk.color_parse('black'))
+
+    def _focus_out_event(self, widget, event):
+        if gtk.Entry.get_text(self) == '':
+            self.set_text(self.placeholder)
+            self.modify_text(gtk.STATE_NORMAL, gtk.gdk.color_parse('gray'))
+            self._default = True
+        else:
+            self._default = False
+
+    def get_text(self):
+        if self._default:
+            return ''
+        return gtk.Entry.get_text(self)
+
+
+if __name__ == '__main__':
+    w = gtk.Window()
+    vbox = gtk.VBox()
+    w.add(vbox)
+    vbox.pack_start(PlaceholderEntry())
+    quitbtn = gtk.Button(stock=gtk.STOCK_QUIT)
+    quitbtn.connect('clicked', gtk.main_quit)
+    vbox.pack_start(quitbtn)
+    w.connect('destroy', gtk.main_quit)
+    w.show_all()
+    gtk.main()
