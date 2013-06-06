@@ -55,6 +55,7 @@ dispatcher = context.get_dispatcher()
 recorderui = context.get_mainwindow().nbox.get_nth_page(0).gui
 rec_button = recorderui.get_object('recbutton')
 edit_button = recorderui.get_object('editbutton')
+data_panel = recorderui.get_object('data_panel')
 
 def init():
     global timeout
@@ -76,6 +77,8 @@ def init():
 
     edit_button.hide()
     rec_button.hide()
+    data_panel.remove_page(0)
+    data_panel.remove_page(1)
     
 def event_change_mode(orig, old_state, new_state):
     """
