@@ -56,6 +56,9 @@ recorderui = context.get_mainwindow().nbox.get_nth_page(0).gui
 rec_button = recorderui.get_object('recbutton')
 edit_button = recorderui.get_object('editbutton')
 data_panel = recorderui.get_object('data_panel')
+rec_tab = recorderui.get_object('tab2')
+rec_title = recorderui.get_object('recording1')
+rec_duration = recorderui.get_object('recording3')
 
 def init():
     global timeout
@@ -79,6 +82,7 @@ def init():
     rec_button.hide()
     data_panel.remove_page(0)
     data_panel.remove_page(1)
+    rec_tab.set_text('')
     
 def event_change_mode(orig, old_state, new_state):
     """
@@ -106,9 +110,11 @@ def show_login(element=None):
         else:
             sussex_login_dialog = LoginDialog()
         waiting_for_details = True
+        rec_title.set_text('Not recording')
+        rec_duration.set_text('')
         sussex_login_dialog.login.set_text('')
         sussex_login_dialog.show() 
-        
+
     return True
 
    
