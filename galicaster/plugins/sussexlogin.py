@@ -52,6 +52,10 @@ logger = context.get_logger()
 conf = context.get_conf()
 dispatcher = context.get_dispatcher()
 
+recorderui = context.get_mainwindow().nbox.get_nth_page(0).gui
+rec_button = recorderui.get_object('recbutton')
+edit_button = recorderui.get_object('editbutton')
+
 def init():
     global timeout
     global cam_profile
@@ -69,8 +73,10 @@ def init():
         
     nocam_profile = conf.get('sussexlogin', 'nocam_profile') or nocam_profile
     logger.info("nocam_profile set to: %s", nocam_profile)
-    
 
+    edit_button.hide()
+    rec_button.hide()
+    
 def event_change_mode(orig, old_state, new_state):
     """
     On changing mode, if the new area is right, shows dialog if necessary
@@ -99,6 +105,7 @@ def show_login(element=None):
         waiting_for_details = True
         sussex_login_dialog.login.set_text('')
         sussex_login_dialog.show() 
+        
     return True
 
    
@@ -109,7 +116,7 @@ class LoginDialog(gtk.Dialog):
         """
         parent = context.get_mainwindow().get_toplevel()
         super(LoginDialog, self).__init__("Log In", parent)
-        
+
         #Properties
         self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_TOOLBAR)
         self.set_skip_taskbar_hint(True)
