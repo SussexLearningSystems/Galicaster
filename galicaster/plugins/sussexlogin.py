@@ -112,6 +112,7 @@ def show_login(element=None):
         waiting_for_details = True
         rec_title.set_text('Not recording')
         rec_duration.set_text('')
+        switch_profile(cam_profile)
         sussex_login_dialog.login.set_text('')
         sussex_login_dialog.show() 
 
