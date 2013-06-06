@@ -50,13 +50,13 @@ ed = None
 
 logger = context.get_logger()
 conf = context.get_conf()
+dispatcher = context.get_dispatcher()
 
 def init():
     global timeout
     global cam_profile
     global nocam_profile
     try:
-        dispatcher = context.get_dispatcher()
         dispatcher.connect('galicaster-status', event_change_mode)
         dispatcher.connect('restart-preview', show_login)
         dispatcher.connect('update-pipeline-status', on_update_pipeline)
@@ -399,8 +399,11 @@ def start_recording(user, title, module, profile):
     room = conf.get('sussexlogin', 'room_name')
     mp.setMetadataByName('spatial', room)
     repo.add(mp)
-    switch_profile(profile)
-    trigger_recording = mp.getIdentifier()
+
+    if switching_profile:
+        trigger_recording = mp.getIdentifier()
+    else:
+        dispatcher.emit('start-before', mp.getIdentifier())
 
 def switch_profile(profile):
     global switching_profile
@@ -408,7 +411,6 @@ def switch_profile(profile):
         switching_profile = True
         conf.change_current_profile(profile)
         conf.update()
-        dispatcher = context.get_dispatcher()
         dispatcher.emit('reload-profile')
     
 def on_update_pipeline(source, old, new):
@@ -416,7 +418,7 @@ def on_update_pipeline(source, old, new):
     playing = (old, new) == (gst.STATE_PAUSED, gst.STATE_PLAYING)
     if playing:
         if trigger_recording:
-            context.get_dispatcher().emit('start-before', trigger_recording)
+            dispatcher.emit('start-before', trigger_recording)
             trigger_recording = None
         time.sleep(0.5)
         
