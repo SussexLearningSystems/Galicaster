@@ -51,10 +51,12 @@ ed = None
 logger = context.get_logger()
 conf = context.get_conf()
 dispatcher = context.get_dispatcher()
+is_admin = conf.is_admin_blocked()
 
 recorderui = context.get_mainwindow().nbox.get_nth_page(0).gui
 rec_button = recorderui.get_object('recbutton')
 edit_button = recorderui.get_object('editbutton')
+help_button = recorderui.get_object('helpbutton')
 data_panel = recorderui.get_object('data_panel')
 rec_tab = recorderui.get_object('tab2')
 rec_title = recorderui.get_object('recording1')
@@ -83,6 +85,7 @@ def init():
 
     edit_button.hide()
     rec_button.hide()
+    help_button.hide()
     data_panel.remove_page(0)
     data_panel.remove_page(1)
     rec_tab.set_text('')
@@ -107,7 +110,9 @@ def show_login(element=None):
     """
     global sussex_login_dialog
     global waiting_for_details
-    if not context.get_state().is_recording and not waiting_for_details:
+    if (not context.get_state().is_recording and 
+        not waiting_for_details and
+        context.get_state().area == 0):
         if sussex_login_dialog:
             pass
         else:
@@ -445,6 +450,8 @@ def on_update_pipeline(source, old, new):
         profile = conf.get('basic','profile')
         if ed:
             ed.cam.set_active(profile == cam_profile)
+        if not waiting_for_details:
+            show_login()
         switching_profile = False
 
 class PlaceholderEntry(gtk.Entry):
