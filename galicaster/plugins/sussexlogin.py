@@ -80,7 +80,8 @@ def init():
     nocam_profile = conf.get('sussexlogin', 'nocam_profile') or nocam_profile
     logger.info("nocam_profile set to: %s", nocam_profile)
 
-    fsize = int(conf.get('sussexlogin', 'font_size')) or fsize
+    fsize = conf.get('sussexlogin', 'font_size') or fsize
+    fsize = int(fsize)
     logger.info("font_size set to: %s", fsize)
 
     edit_button.hide()
