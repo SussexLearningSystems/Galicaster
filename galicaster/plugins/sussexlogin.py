@@ -39,8 +39,8 @@ from operator import itemgetter
 #defaults 
 cam_profile = 'cam'
 nocam_profile = 'nocam'
-
 fsize = 50
+
 sussex_login_dialog = None
 waiting_for_details = False
 trigger_recording = None
@@ -62,8 +62,8 @@ rec_duration = recorderui.get_object('recording3')
 
 def init():
     global timeout
-    global cam_profile
-    global nocam_profile
+    global cam_profile, nocam_profile
+    global fsize
     try:
         dispatcher.connect('galicaster-status', event_change_mode)
         dispatcher.connect('restart-preview', show_login)
@@ -77,6 +77,9 @@ def init():
         
     nocam_profile = conf.get('sussexlogin', 'nocam_profile') or nocam_profile
     logger.info("nocam_profile set to: %s", nocam_profile)
+
+    fsize = int(conf.get('sussexlogin', 'font_size')) or fsize
+    logger.info("font_size set to: %s", fsize)
 
     edit_button.hide()
     rec_button.hide()
