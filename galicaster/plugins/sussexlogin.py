@@ -519,16 +519,3 @@ class PlaceholderEntry(gtk.Entry):
         if self._default:
             return ''
         return gtk.Entry.get_text(self)
-
-
-if __name__ == '__main__':
-    w = gtk.Window()
-    vbox = gtk.VBox()
-    w.add(vbox)
-    vbox.pack_start(PlaceholderEntry())
-    quitbtn = gtk.Button(stock=gtk.STOCK_QUIT)
-    quitbtn.connect('clicked', gtk.main_quit)
-    vbox.pack_start(quitbtn)
-    w.connect('destroy', gtk.main_quit)
-    w.show_all()
-    gtk.main()
