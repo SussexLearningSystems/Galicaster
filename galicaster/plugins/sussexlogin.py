@@ -37,6 +37,7 @@ from galicaster.mediapackage.mediapackage import Mediapackage
 from operator import itemgetter
 
 #defaults 
+cam_available = True
 cam_profile = 'cam'
 nocam_profile = 'nocam'
 fsize = 50
@@ -85,7 +86,7 @@ rec_duration = recorderui.get_object('recording3')
 
 def init():
     global timeout
-    global cam_profile, nocam_profile
+    global cam_available, cam_profile, nocam_profile
     global fsize
     try:
         dispatcher.connect('galicaster-status', event_change_mode)
@@ -95,9 +96,13 @@ def init():
     except ValueError:
         pass
     
+    cam_available = conf.get('sussexlogin', 'cam_available') or cam_available
+    cam_available = True if cam_available in ('True', 'true') else False
+    logger.info("cam_available set to: %r", cam_available)
+        
     cam_profile = conf.get('sussexlogin', 'cam_profile') or cam_profile
     logger.info("cam_profile set to: %s", cam_profile)
-        
+
     nocam_profile = conf.get('sussexlogin', 'nocam_profile') or nocam_profile
     logger.info("nocam_profile set to: %s", nocam_profile)
 
@@ -142,10 +147,12 @@ def show_login(element=None):
         waiting_for_details = True
         rec_title.set_text('Not recording')
         rec_duration.set_text('')
-        switch_profile(cam_profile)
+        if cam_available and (profile == nocam_profile):
+            switch_profile(cam_profile)
+        elif (profile == cam_profile) or not cam_available:
+            switch_profile(nocam_profile)
         sussex_login_dialog.login.set_text('')
         sussex_login_dialog.show() 
-
     return True
 
    
@@ -301,11 +308,12 @@ class EnterDetails(gtk.Window):
         title = PlaceholderEntry(placeholder='Enter a title here...')
         title.modify_font(fdesc)
         self.t = title
-        
-        cam = gtk.CheckButton(label='Camera')
-        cam.connect('clicked', self._toggled)
-        cam.child.set_attributes(attr)
-        self.cam = cam
+
+        if cam_available:
+            cam = gtk.CheckButton(label='Camera')
+            cam.connect('clicked', self._toggled)
+            cam.child.set_attributes(attr)
+            self.cam = cam
         
         rec_image = gtk.Image()
         icon = gtk.icon_theme_get_default().load_icon('media-record', 
@@ -331,7 +339,8 @@ class EnterDetails(gtk.Window):
         cancel.child.set_padding(-1, int(fsize / 2.5))
 
         hbox2.pack_start(title)
-        hbox2.pack_start(cam, False, False, 5)
+        if cam_available:
+            hbox2.pack_start(cam, False, False, 5)
         hbox3.pack_start(record, padding=5)
         hbox3.pack_start(cancel, padding=5)
         vbox2.pack_start(self.module)
@@ -344,7 +353,8 @@ class EnterDetails(gtk.Window):
         self.add(vbox)
         self.set_transient_for(parent)
         self.show_all()
-        switch_profile(nocam_profile)
+        if cam_available:
+            switch_profile(nocam_profile)
 
     def _toggled(self, widget):
         use_cam = widget.get_active()
@@ -358,7 +368,7 @@ class EnterDetails(gtk.Window):
         if iter:
             mod = self.liststore.get(iter, 0, 1)
         name = self.t.get_text() or 'Unknown'
-        cam = self.cam.get_active()
+        cam = self.cam.get_active() if cam_available else False
         profile = cam_profile if cam else nocam_profile
         start_recording(self.u, name, mod, profile)
 
@@ -473,7 +483,7 @@ def on_update_pipeline(source, old, new):
         time.sleep(0.5)
         
         profile = conf.get('basic','profile')
-        if ed:
+        if ed and cam_available:
             ed.cam.set_active(profile == cam_profile)
         if not waiting_for_details:
             show_login()
