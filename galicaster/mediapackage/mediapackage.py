@@ -724,7 +724,7 @@ class Mediapackage(object):
                 pass
             
     #FIXME merge with add
-    def addAttachmentAsString(self, content, name=None, rewrite=False, identifier=None):
+    def addAttachmentAsString(self, content, name=None, rewrite=False, identifier=None, flavor=None):
         assert path.isdir(self.getURI())
 
         f_path = path.join(self.getURI(), name if name != None else 'data' )
@@ -734,7 +734,7 @@ class Mediapackage(object):
         f.close()
 
         if not rewrite:
-            self.add(f_path, etype=TYPE_ATTACHMENT, identifier=identifier)
+            self.add(f_path, etype=TYPE_ATTACHMENT, identifier=identifier, flavor=flavor)
 
 
     def getOCCaptureAgentProperty(self, name):
