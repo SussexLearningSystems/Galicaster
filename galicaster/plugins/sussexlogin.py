@@ -379,7 +379,8 @@ class EnterDetails(gtk.Window):
         global waiting_for_details
         waiting_for_details = False
         self.destroy()
-        show_login()
+        if not is_admin:
+            show_login()
 
 
 def get_user_details(user=None):
