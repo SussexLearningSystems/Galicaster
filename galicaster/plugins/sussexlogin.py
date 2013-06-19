@@ -48,6 +48,27 @@ switching_profile = False
 profile = nocam_profile
 ed = None
 
+acl = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+       '<Policy RuleCombiningAlgId="urn:oasis:names:tc:xacml:1.0:rule-combining-algorithm:permit-overrides" '
+       'Version="2.0" PolicyId="%s" xmlns="urn:oasis:names:tc:xacml:2.0:policy:schema:os">'
+       '<Target><Resources><Resource><ResourceMatch '
+       'MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">'
+       '<AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">%s</AttributeValue>'
+       '<ResourceAttributeDesignator DataType="http://www.w3.org/2001/XMLSchema#string" '
+       'AttributeId="urn:oasis:names:tc:xacml:1.0:resource:resource-id"/>'
+       '</ResourceMatch></Resource></Resources></Target><Rule Effect="Permit" '
+       'RuleId="ROLE_ANONYMOUS_read_Permit"><Target>'
+       '<Actions><Action><ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">'
+       '<AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">read</AttributeValue>'
+       '<ActionAttributeDesignator DataType="http://www.w3.org/2001/XMLSchema#string" '
+       'AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id"/></ActionMatch>'
+       '</Action></Actions></Target><Condition>'
+       '<Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-is-in">'
+       '<AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">ROLE_ANONYMOUS</AttributeValue>'
+       '<SubjectAttributeDesignator DataType="http://www.w3.org/2001/XMLSchema#string" '
+       'AttributeId="urn:oasis:names:tc:xacml:2.0:subject:role"/></Apply></Condition></Rule>'
+       '<Rule Effect="Deny" RuleId="DenyRule"/></Policy>')
+
 logger = context.get_logger()
 conf = context.get_conf()
 dispatcher = context.get_dispatcher()
@@ -426,6 +447,8 @@ def start_recording(user, title, module, profile):
     room = conf.get('sussexlogin', 'room_name')
     mp.setMetadataByName('spatial', room)
     repo.add(mp)
+    mp.addAttachmentAsString(acl % (mp.getIdentifier(), mp.getIdentifier()), 
+                             name='xacml.xml', flavor='security/xacml')
 
     if switching_profile:
         trigger_recording = mp.getIdentifier()
