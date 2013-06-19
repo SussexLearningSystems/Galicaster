@@ -97,7 +97,7 @@ def init():
         pass
     
     cam_available = conf.get('sussexlogin', 'cam_available') or cam_available
-    cam_available = True if cam_available in ('True', 'true') else False
+    cam_available = True if cam_available in ('True', 'true', True) else False
     logger.info("cam_available set to: %r", cam_available)
         
     cam_profile = conf.get('sussexlogin', 'cam_profile') or cam_profile
@@ -147,7 +147,7 @@ def show_login(element=None):
         waiting_for_details = True
         rec_title.set_text('Not recording')
         rec_duration.set_text('')
-        if cam_available and (profile == nocam_profile):
+        if cam_available:
             switch_profile(cam_profile)
         elif (profile == cam_profile) or not cam_available:
             switch_profile(nocam_profile)
