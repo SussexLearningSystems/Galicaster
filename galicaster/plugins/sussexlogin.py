@@ -118,7 +118,8 @@ def show_login(element=None):
     global waiting_for_details
     if (not context.get_state().is_recording and 
         not waiting_for_details and
-        context.get_state().area == 0):
+        context.get_state().area == 0 and
+        context.get_state().status == 'Preview'):
         if sussex_login_dialog:
             pass
         else:
@@ -450,7 +451,7 @@ def switch_profile(profile):
         conf.change_current_profile(profile)
         conf.update()
         dispatcher.emit('reload-profile')
-    
+
 def on_update_pipeline(source, old, new):
     global trigger_recording, switching_profile, profile
     playing = (old, new) == (gst.STATE_PAUSED, gst.STATE_PLAYING)
