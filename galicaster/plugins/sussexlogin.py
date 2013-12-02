@@ -323,7 +323,8 @@ class EnterDetails(gtk.Window):
             hbox2.pack_start(cam, False, False, 5)
         hbox3.pack_start(record, padding=5)
         hbox3.pack_start(cancel, padding=5)
-        vbox2.pack_start(self.module)
+        if u and u['modules']:
+            vbox2.pack_start(self.module)
         vbox2.pack_start(hbox2, padding=5)
         vbox2.pack_start(hbox3, padding=5)
         hbox.pack_start(photo, False, False, 5)
