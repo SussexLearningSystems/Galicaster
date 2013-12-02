@@ -1,7 +1,6 @@
 Datapath Device module configuration
 ================================
 
-
 Note
 ----
 This module is similar to the V4L2 module, with differences on the default parameters. In addition, pausing this module is blocked since the driver don't guarantee a proper recording when pausing and unplugging the input. Future drivers may solve this issue, then datapath cards could be used with the v4l2 device module.

@@ -31,7 +31,6 @@ caps:  GStreamer cappabilities of the device. Check the caps section for more in
 * Use GVUCView tool to know wich capabilities are compatible with your device
 * For more information  http://pygstdocs.berlios.de/pygst-tutorial/capabilities.html
 
-
 Caps
 ----
 
