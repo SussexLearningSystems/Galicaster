@@ -17,59 +17,76 @@ inhibit mate-screensaver when recording.
 power management should still be turned off manually for now.
 """
 
-import os
 import dbus
-from dbus.mainloop.glib import DBusGMainLoop
-#from gi.repository import Gio
+import subprocess
+import time
+
 from galicaster.core import context
 
 logger = context.get_logger()
 dispatcher = context.get_dispatcher()
+conf = context.get_conf()
 
 cookie = None
-idle_delay = 5
+idle_delay = 20
+hourly_wake = False
+hourly_wake_from = 8
+hourly_wake_to = 17
+hourly_wake_minute = 50
+
+# set up dbus stuff
+dbus_session = dbus.SessionBus()
+bus_name = "org.mate.ScreenSaver"
+object_path = "/org/mate/ScreenSaver"
+screen_saver = dbus_session.get_object(bus_name, object_path)
+ss_inhibit = screen_saver.get_dbus_method('Inhibit')
+ss_uninhibit = screen_saver.get_dbus_method('UnInhibit')
 
 def init():
-    idle_delay = context.get_conf().get('sussexscreensaver', 'idle_delay')
+    global idle_delay, hourly_wake, hourly_wake_from, hourly_wake_to, hourly_wake_minute
+    idle_delay = conf.get_int('sussexscreensaver', 'idle_delay') or 20
+    logger.debug('idle_delay set to %i', idle_delay)
 
-    #dconf_session = Gio.Settings.new("org.mate.session")
-    #dconf_session.set_int('idle-delay', idle_delay)
+    hourly_wake = conf.get_boolean('sussexscreensaver', 'hourly_wake') or False
+    logger.debug('hourly_wake set to %s', hourly_wake)
 
-    os.system('dconf write /org/mate/desktop/session/idle-delay ' + idle_delay) 
-    dispatcher.connect('upcoming-recording', inhibit_and_poke)
+    hourly_wake_from = conf.get_int('sussexscreensaver', 'hourly_wake_from') or 8
+    logger.debug('hourly_wake_from set to %i', hourly_wake_from)
+
+    hourly_wake_to = conf.get_int('sussexscreensaver', 'hourly_wake_to') or 17
+    logger.debug('hourly_wake_to set to %i', hourly_wake_to)
+
+    hourly_wake_minute = conf.get_int('sussexscreensaver', 'hourly_wake_minute') or 50
+    logger.debug('hourly_wake_minute set to %i', hourly_wake_minute)
+
+    subprocess.call(['dconf', 'write', '/org/mate/desktop/session/idle-delay', '%i' % idle_delay]) 
     dispatcher.connect('starting-record', inhibit)
     dispatcher.connect('restart-preview', uninhibit)
     dispatcher.connect('galicaster-notify-quit', uninhibit)
     dispatcher.connect('galicaster-quit', uninhibit)
-
-def get_screensaver_method(method):
-    dbus_loop = DBusGMainLoop()
-    session = dbus.SessionBus(mainloop=dbus_loop)
-    bus_name = "org.mate.ScreenSaver"
-    object_path = "/org/mate/ScreenSaver"
-    screen_saver = session.get_object(bus_name, object_path)
-    return screen_saver.get_dbus_method(method)
+    dispatcher.connect('galicaster-notify-timer-long', pre_lecture_wake)
 
 def inhibit(signal=None):
     global cookie
     if cookie is None:
         logger.debug('Inhibiting screensaver')
-        ss_inhibit = get_screensaver_method('Inhibit')
         cookie = ss_inhibit('Galicaster', 'Recording')
 
 def uninhibit(signal=None):
     global cookie
     if cookie is not None:
         logger.debug('Un-inhibiting screensaver')
-        ss_uninhibit = get_screensaver_method('UnInhibit')
         ss_uninhibit(cookie)
         cookie = None
 
-def poke_screen(signal=None):
-    poke = get_screensaver_method('SimulateUserActivity')
-    a = poke() 
+def pre_lecture_wake(signal=None):
+    now = time.localtime()
+    if (hourly_wake and now.tm_hour >= hourly_wake_from 
+                    and now.tm_hour <= hourly_wake_to 
+                    and now.tm_min == hourly_wake_minute):
+        wake_screen()
 
-
-def inhibit_and_poke(signal=None):
-    inhibit()
-    poke_screen()
+def wake_screen(signal=None):
+    logger.debug('waking!')
+    # bodge as nothing sensible seems to work
+    subprocess.call(['xdotool', 'keydown',  'control',  'keyup', 'control'])
