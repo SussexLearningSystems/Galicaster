@@ -29,3 +29,9 @@ pip-log.txt
 tests/resources/attach/
 tests/resources/repository/attach/
 tests/resources/profile/folder/
+
+#Sussex
+*.log*
+conf.ini
+conf-dist.ini
+*.OLD
