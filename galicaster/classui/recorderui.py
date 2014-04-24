@@ -66,7 +66,7 @@ STATUS = [  ["Initialization","#F7F6F6"],
             ["Paused","#F7F6F6"],
             ["Stopped","#F7F6F6"],
             ["Blocked","#F7F6F6"],
-            ["Waiting","#F7F6F6"],
+            ["","#F7F6F6"],
             ["Error","#FF0000"],
             ]
 
