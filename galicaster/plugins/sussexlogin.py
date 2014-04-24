@@ -205,6 +205,10 @@ class LoginDialog(gtk.Dialog):
         self.login.show()
         label1.show()
 
+        # listen for key presses
+        self.add_events(gtk.gdk.KEY_PRESS_MASK)
+        self.connect('key-press-event', self.eat_escape)
+
     def do_login(self, button):
         """
         Called when you press the login button
@@ -212,7 +216,10 @@ class LoginDialog(gtk.Dialog):
         global ed
         self.hide()
         ed = EnterDetails(self.login.get_text())
-        
+
+    # ignore escape presses
+    def eat_escape(self, widget, event):
+        return event.keyval == 65307
 
 def set_font(description):
         """Asign a font description to a text"""
