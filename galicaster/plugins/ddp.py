@@ -59,7 +59,7 @@ class DDP(Thread):
     me = self.client.find_one('rooms')
     is_recording = context.get_state().is_recording
     result = {}
-    if not 'recording' in me or is_recording != me['recording']:
+    if me and (not 'recording' in me or is_recording != me['recording']):
       result = {'recording': is_recording}
     return result
 
@@ -79,10 +79,11 @@ class DDP(Thread):
     with open('/tmp/CAMERA.avi.jpg', mode='rb') as file:
       presenterVideo = base64.b64encode(file.read())
 
-    self.client.update('rooms', {'_id': self.id},
-                       {'$set': {'screen': 'data:image/jpeg;base64,' + screen,
-                                 'presentationVideo': 'data:image/jpeg;base64,' + presentationVideo,
-                                 'presenterVideo': 'data:image/jpeg;base64,' + presenterVideo}})
+    if self.connected:
+      self.client.update('rooms', {'_id': self.id},
+                         {'$set': {'screen': 'data:image/jpeg;base64,' + screen,
+                                   'presentationVideo': 'data:image/jpeg;base64,' + presentationVideo,
+                                   'presenterVideo': 'data:image/jpeg;base64,' + presenterVideo}})
     exec_time = time.time() - start
     Timer(1 - exec_time, self.update_screenshots).start()
 
@@ -110,7 +111,8 @@ class DDP(Thread):
       data = int(((data + self.vu_range) / float(self.vu_range)) * 100)
       update = {'vumeter': data}
       update.update(self.is_recording())
-      self.client.update('rooms', {'_id': self.id}, {'$set': update})
+      if self.connected:
+        self.client.update('rooms', {'_id': self.id}, {'$set': update})
 
     self.do_vu = (self.do_vu + 1) % 4
 
@@ -127,10 +129,10 @@ class DDP(Thread):
   def on_subscribed(self, subscription):
     me = self.client.find_one('rooms')
     audio = self.read_audio_settings()
-    if me:
+    if me and self.connected:
       self.client.update('rooms', {'_id': self.id}, {'displayName': self.displayName, 'audio': audio, 'ip': self.ip},
                          callback=self.update_callback)
-    else:
+    elif self.connected:
       self.client.insert('rooms', {'_id': self.id, 'displayName': self.displayName, 'audio': audio, 'ip': self.ip})
 
   def on_changed(self, collection, id, fields, cleared):
@@ -156,7 +158,8 @@ class DDP(Thread):
     audio = self.read_audio_settings()
     if ((int(me['audio']['capture']['value']['left']) != int(audio['capture']['value']['left'])) or
           (int(me['audio']['rearMicBoost']['value']['left']) != int(audio['rearMicBoost']['value']['left']))):
-      self.client.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
+      if self.connected:
+        self.client.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
 
   def read_audio_settings(self):
     audio_settings = {}
