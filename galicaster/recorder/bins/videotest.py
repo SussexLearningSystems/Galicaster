@@ -26,7 +26,9 @@ pipestr = (' videotestsrc name=gc-videotest-src pattern=0 is-live=true ! capsfil
            ' queue !  ffmpegcolorspace ! queue ! xvimagesink sync=false async=false qos=false name=gc-videotest-preview'
            ' tee-vt. ! queue ! valve drop=false name=gc-videotest-valve ! ffmpegcolorspace ! queue ! '
            ' gc-videotest-enc ! queue ! gc-videotest-mux ! '
-           ' queue ! filesink name=gc-videotest-sink async=false')
+           ' queue ! filesink name=gc-videotest-sink async=false'
+           ' tee-vt. ! queue ! videorate ! videoscale ! video/x-raw-yuv, width=640, height=360, framerate=1/1 !'
+           ' jpegenc ! multifilesink name=gc-videotest-thumbsink ')
 
 
 class GCvideotest(gst.Bin, base.Base):
@@ -119,7 +121,7 @@ class GCvideotest(gst.Bin, base.Base):
         self.add(bin)
 
         self.get_by_name('gc-videotest-sink').set_property('location', path.join(self.options['path'], self.options['file']))
-
+        self.set_value_in_pipeline(path.join('/tmp', self.options['file'] + '.jpg'), 'gc-videotest-thumbsink', 'location')
         #self.get_by_name('gc-videotest-filter').set_property('caps', gst.Caps(self.options['caps']))
         #fr = re.findall("framerate *= *[0-9]+/[0-9]+", self.options['caps'])
         #if fr:

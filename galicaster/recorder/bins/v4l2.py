@@ -26,7 +26,10 @@ pipestr = (' v4l2src name=gc-v4l2-src ! capsfilter name=gc-v4l2-filter ! queue !
            ' tee name=gc-v4l2-tee  ! queue ! ffmpegcolorspace ! videoscale ! ximagesink async=false sync=false qos=false name=gc-v4l2-preview'
            ' gc-v4l2-tee. ! queue ! valve drop=false name=gc-v4l2-valve ! ffmpegcolorspace ! queue ! '
            ' gc-v4l2-enc ! queue ! gc-v4l2-mux ! '
-           ' queue ! filesink name=gc-v4l2-sink async=false')
+           ' queue ! filesink name=gc-v4l2-sink async=false'
+           ' gc-v4l2-tee. ! queue ! videorate ! videoscale ! video/x-raw-yuv, width=640, height=360, framerate=1/1 !'
+           ' jpegenc ! multifilesink name=gc-v4l2-thumbsink ')
+
 
 
 class GCv4l2(gst.Bin, base.Base):
@@ -131,7 +134,8 @@ class GCv4l2(gst.Bin, base.Base):
         self.set_option_in_pipeline('location', 'gc-v4l2-src', 'device')
 
         self.set_value_in_pipeline(path.join(self.options['path'], self.options['file']), 'gc-v4l2-sink', 'location')
-
+        self.set_value_in_pipeline(path.join('/tmp', self.options['file'] + '.jpg'), 'gc-v4l2-thumbsink', 'location')
+        
         self.set_option_in_pipeline('caps', 'gc-v4l2-filter', 'caps', gst.Caps)
         fr = re.findall("framerate *= *[0-9]+/[0-9]+", self.options['caps'])
         if fr:            
