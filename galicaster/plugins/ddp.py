@@ -14,8 +14,7 @@ from galicaster.core import context
 
 conf = context.get_conf()
 dispatcher = context.get_dispatcher()
-
-ddp = None
+logger = context.get_logger()
 
 
 def init():
@@ -27,6 +26,15 @@ class DDP(Thread):
   def __init__(self):
     Thread.__init__(self)
     self.meteor = conf.get('ddp', 'meteor')
+
+    self.client = MeteorClient(self.meteor, debug=False)
+    self.client.on('changed', self.on_changed)
+    self.client.on('subscribed', self.on_subscribed)
+    self.client.on('connected', self.on_connected)
+    self.client.on('reconnected', self.on_connected)
+    self.client.on('closed', self.on_closed)
+
+    self.connected = False
     self.displayName = conf.get('sussexlogin', 'room_name')
     self.vu_min = -70
     self.vu_range = 40
@@ -35,14 +43,12 @@ class DDP(Thread):
     self.id = conf.get('ingest', 'hostname')
     self.capture_mixer = alsaaudio.Mixer(control='Capture')
     self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
+
     dispatcher.connect('update-rec-vumeter', self.vumeter)
 
   def run(self):
-    self.client = MeteorClient(self.meteor, debug=False)
     self.client.connect()
     self.client.subscribe('GalicasterControl', params=[self.id], callback=self.subscription_callback)
-    self.client.on('changed', self.changed)
-    self.client.on('subscribed', self.subscribed)
     fd, eventmask = self.capture_mixer.polldescriptors()[0]
     self.capture_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
     fd, eventmask = self.boost_mixer.polldescriptors()[0]
@@ -118,7 +124,7 @@ class DDP(Thread):
       return
     print '*** DATA: ', data
 
-  def subscribed(self, subscription):
+  def on_subscribed(self, subscription):
     me = self.client.find_one('rooms')
     audio = self.read_audio_settings()
     if me:
@@ -127,7 +133,7 @@ class DDP(Thread):
     else:
       self.client.insert('rooms', {'_id': self.id, 'displayName': self.displayName, 'audio': audio, 'ip': self.ip})
 
-  def changed(self, collection, id, fields, cleared):
+  def on_changed(self, collection, id, fields, cleared):
     me = self.client.find_one('rooms')
     level = int((float(me['audio']['capture']['value']['left']) / float(me['audio']['capture']['limits']['max'])) * 100)
     self.capture_mixer.setvolume(level, 0, 'capture')
@@ -136,6 +142,14 @@ class DDP(Thread):
       (float(me['audio']['rearMicBoost']['value']['left']) / float(me['audio']['rearMicBoost']['limits']['max'])) * 100)
     self.boost_mixer.setvolume(level, 0, 'capture')
     self.boost_mixer.setvolume(level, 1, 'capture')
+
+  def on_connected(self):
+    logger.info('Connected to Meteor')
+    self.connected = True
+
+  def on_closed(self, code, reason):
+    logger.error('Disconnected from Meteor: err %d - %s' % (code, reason))
+    self.connected = False
 
   def update_audio(self):
     me = self.client.find_one('rooms')
