@@ -22,6 +22,17 @@ def init():
   ddp.start()
 
 
+def dict_diff(dict_a, dict_b):
+  return dict([
+    (key, dict_b.get(key, dict_a.get(key)))
+    for key in set(dict_a.keys() + dict_b.keys())
+    if (
+      (key in dict_a and (not key in dict_b or dict_a[key] != dict_b[key])) or
+      (key in dict_b and (not key in dict_a or dict_a[key] != dict_b[key]))
+    )
+  ])
+
+
 class DDP(Thread):
   def __init__(self):
     Thread.__init__(self)
@@ -43,6 +54,7 @@ class DDP(Thread):
     self.id = conf.get('ingest', 'hostname')
     self.capture_mixer = alsaaudio.Mixer(control='Capture')
     self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
+    self.old_videos = {}
 
     dispatcher.connect('update-rec-vumeter', self.vumeter)
 
@@ -53,7 +65,6 @@ class DDP(Thread):
     self.capture_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
     fd, eventmask = self.boost_mixer.polldescriptors()[0]
     self.boost_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
-    self.update_screenshots()
 
   def is_recording(self):
     me = self.client.find_one('rooms')
@@ -71,21 +82,30 @@ class DDP(Thread):
     if im.mode != "RGB":
       im = im.convert("RGB")
     im.save(output, format="JPEG")
-    screen = base64.b64encode(output.getvalue())
+    screen = 'data:image/jpeg;base64,' + base64.b64encode(output.getvalue())
 
-    with open('/tmp/SCREEN.avi.jpg', mode='rb') as file:
-      presentationVideo = base64.b64encode(file.read())
+    try:
+      with open('/tmp/SCREEN.avi.jpg', mode='rb') as file:
+        presentationVideo = 'data:image/jpeg;base64,' + base64.b64encode(file.read())
+    except IOError:
+      presentationVideo = ''
 
-    with open('/tmp/CAMERA.avi.jpg', mode='rb') as file:
-      presenterVideo = base64.b64encode(file.read())
+    try:
+      with open('/tmp/CAMERA.avi.jpg', mode='rb') as file:
+        presenterVideo = 'data:image/jpeg;base64,' + base64.b64encode(file.read())
+    except IOError:
+      presenterVideo = ''
 
+    videos = {'screen': screen,
+              'presentationVideo': presentationVideo,
+              'presenterVideo': presenterVideo}
+
+    set = {'$set': dict_diff(self.old_videos, videos)}
     if self.connected:
-      self.client.update('rooms', {'_id': self.id},
-                         {'$set': {'screen': 'data:image/jpeg;base64,' + screen,
-                                   'presentationVideo': 'data:image/jpeg;base64,' + presentationVideo,
-                                   'presenterVideo': 'data:image/jpeg;base64,' + presenterVideo}})
+      self.client.update('rooms', {'_id': self.id}, set)
     exec_time = time.time() - start
     Timer(1 - exec_time, self.update_screenshots).start()
+    self.old_videos = videos
 
   def mixer_changed(self, source=None, condition=None, reopen=True):
     if reopen:
@@ -134,6 +154,7 @@ class DDP(Thread):
                          callback=self.update_callback)
     elif self.connected:
       self.client.insert('rooms', {'_id': self.id, 'displayName': self.displayName, 'audio': audio, 'ip': self.ip})
+    self.update_screenshots()
 
   def on_changed(self, collection, id, fields, cleared):
     me = self.client.find_one('rooms')
