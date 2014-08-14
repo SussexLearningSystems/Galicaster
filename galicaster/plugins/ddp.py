@@ -55,6 +55,7 @@ class DDP(Thread):
     self.capture_mixer = alsaaudio.Mixer(control='Capture')
     self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
     self.old_videos = {}
+    self.update_screenshots_running = False
 
     dispatcher.connect('update-rec-vumeter', self.vumeter)
 
@@ -75,6 +76,7 @@ class DDP(Thread):
     return result
 
   def update_screenshots(self):
+    self.update_screenshots_running = True
     start = time.time()
     im = ImageGrab.grab(bbox=(10, 10, 1280, 720), backend='imagemagick')
     im.thumbnail((640, 360))
@@ -154,7 +156,8 @@ class DDP(Thread):
                          callback=self.update_callback)
     elif self.connected:
       self.client.insert('rooms', {'_id': self.id, 'displayName': self.displayName, 'audio': audio, 'ip': self.ip})
-    self.update_screenshots()
+    if not self.update_screenshots_running:
+      self.update_screenshots()
 
   def on_changed(self, collection, id, fields, cleared):
     me = self.client.find_one('rooms')
