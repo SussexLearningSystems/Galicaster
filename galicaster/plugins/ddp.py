@@ -2,7 +2,7 @@ import alsaaudio
 import base64
 import cStringIO
 import socket
-from threading import Thread, Timer
+from threading import Event, Thread
 import time
 
 import gobject
@@ -33,6 +33,20 @@ def dict_diff(dict_a, dict_b):
   ])
 
 
+def call_repeatedly(interval, func, *args):
+  stopped = Event()
+
+  def loop():
+    exec_time = 0
+    while not stopped.wait(interval - exec_time):
+      start = time.time()
+      func(*args)
+      exec_time = time.time() - start
+
+  Thread(target=loop).start()
+  return stopped.set
+
+
 class DDP(Thread):
   def __init__(self):
     Thread.__init__(self)
@@ -55,17 +69,15 @@ class DDP(Thread):
     self.capture_mixer = alsaaudio.Mixer(control='Capture')
     self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
     self.old_videos = {}
-    self.update_screenshots_running = False
+    self.stop_update_screenshots = None
+    self.capture_watchid = None
+    self.boost_watchid = None
 
     dispatcher.connect('update-rec-vumeter', self.vumeter)
 
   def run(self):
     self.client.connect()
     self.client.subscribe('GalicasterControl', params=[self.id], callback=self.subscription_callback)
-    fd, eventmask = self.capture_mixer.polldescriptors()[0]
-    self.capture_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
-    fd, eventmask = self.boost_mixer.polldescriptors()[0]
-    self.boost_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
 
   def is_recording(self):
     me = self.client.find_one('rooms')
@@ -76,8 +88,6 @@ class DDP(Thread):
     return result
 
   def update_screenshots(self):
-    self.update_screenshots_running = True
-    start = time.time()
     im = ImageGrab.grab(bbox=(10, 10, 1280, 720), backend='imagemagick')
     im.thumbnail((640, 360))
     output = cStringIO.StringIO()
@@ -105,8 +115,6 @@ class DDP(Thread):
     set = {'$set': dict_diff(self.old_videos, videos)}
     if self.connected:
       self.client.update('rooms', {'_id': self.id}, set)
-    exec_time = time.time() - start
-    Timer(1 - exec_time, self.update_screenshots).start()
     self.old_videos = videos
 
   def mixer_changed(self, source=None, condition=None, reopen=True):
@@ -157,10 +165,6 @@ class DDP(Thread):
     elif self.connected:
       self.client.insert('rooms', {'_id': self.id, 'displayName': self.displayName, 'audio': audio, 'ip': self.ip})
 
-    self.old_videos = {}
-    if not self.update_screenshots_running:
-      self.update_screenshots()
-
   def on_changed(self, collection, id, fields, cleared):
     me = self.client.find_one('rooms')
     level = int((float(me['audio']['capture']['value']['left']) / float(me['audio']['capture']['limits']['max'])) * 100)
@@ -174,18 +178,35 @@ class DDP(Thread):
   def on_connected(self):
     logger.info('Connected to Meteor')
     self.connected = True
+    if self.stop_update_screenshots:
+      self.stop_update_screenshots()
+
+    if not self.capture_watchid:
+      fd, eventmask = self.capture_mixer.polldescriptors()[0]
+      self.capture_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
+    if not self.boost_watchid:
+      fd, eventmask = self.boost_mixer.polldescriptors()[0]
+      self.boost_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
+
+    self.old_videos = {}
+    self.stop_update_screenshots = call_repeatedly(1, self.update_screenshots)
 
   def on_closed(self, code, reason):
     logger.error('Disconnected from Meteor: err %d - %s' % (code, reason))
+    if self.stop_update_screenshots:
+      self.stop_update_screenshots()
     self.connected = False
 
   def update_audio(self):
     me = self.client.find_one('rooms')
     audio = self.read_audio_settings()
-    if ((int(me['audio']['capture']['value']['left']) != int(audio['capture']['value']['left'])) or
-          (int(me['audio']['rearMicBoost']['value']['left']) != int(audio['rearMicBoost']['value']['left']))):
-      if self.connected:
-        self.client.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
+    if me:
+      if ((int(me['audio']['capture']['value']['left']) != int(audio['capture']['value']['left'])) or
+            (int(me['audio']['rearMicBoost']['value']['left']) != int(audio['rearMicBoost']['value']['left']))):
+        if self.connected:
+          self.client.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
+    else:
+      self.client.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
 
   def read_audio_settings(self):
     audio_settings = {}
