@@ -156,6 +156,8 @@ class DDP(Thread):
                          callback=self.update_callback)
     elif self.connected:
       self.client.insert('rooms', {'_id': self.id, 'displayName': self.displayName, 'audio': audio, 'ip': self.ip})
+
+    self.old_videos = {}
     if not self.update_screenshots_running:
       self.update_screenshots()
 
