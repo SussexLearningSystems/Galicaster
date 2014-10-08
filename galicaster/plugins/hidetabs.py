@@ -21,7 +21,12 @@ ALL_TABS = { "events": "eventpanel",
              "status": "status_panel",
              "recording": "rec_panel",
              }
-
+ALL_BUTTONS = { "rec": "recbutton",
+                "edit": "editbutton",
+                "help": "helpbutton",
+                "pause": "pausebutton",
+                "stop": "stopbutton",
+              }
 
 
 def init():
@@ -36,12 +41,6 @@ def post_init(source=None):
 
     data_panel = recorder_ui.get_object('data_panel')
 
-    #rec_button = recorder_ui.gui.get_object('recbutton')
-    #edit_button = recorder_ui.gui.get_object('editbutton')
-    #help_button = recorder_ui.gui.get_object('helpbutton')
-    #pause_button = recorder_ui.gui.get_object('pausebutton')
-    #stop_button = recorder_ui.gui.get_object('stopbutton')
-
     # Customize tabs in the recorder UI
     try: 
         tabs_to_hide = set( x for x in set(conf.get('hidetabs', 'hide').split()) if x in ALL_TABS )
@@ -52,6 +51,18 @@ def post_init(source=None):
                     page.hide_all()
                 else:
                     data_panel.set_tab_label_packing(page, False, True,gtk.PACK_START)
+    except AttributeError as e:
+        # The conf parameter isn't defined. Ignore
+        print "Attribute error"
+        pass
+
+    try:
+        buttons_to_hide = set( x for x in set(conf.get('hidetabs', 'buttons').split()) if x in ALL_BUTTONS )
+        if buttons_to_hide:
+            for but, obj_name in ALL_BUTTONS.iteritems():
+                button = recorder_ui.get_object(obj_name)
+                if but in buttons_to_hide:
+                    button.hide()
     except AttributeError as e:
         # The conf parameter isn't defined. Ignore
         print "Attribute error"
