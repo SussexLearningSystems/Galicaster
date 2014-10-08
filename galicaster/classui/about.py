@@ -20,14 +20,14 @@ from galicaster.classui import get_ui_path, get_image_path
 from galicaster.classui.elements.message_header import Header
 
 from galicaster import __version__
+from galicaster.utils.i18n import _
 
 PROGRAM = "Galicaster"
-COPY1 = "Copyright © 2011 Teltek"
-COPY2 = "Copyright © 2011 Héctor Canto, Rubén González"
+COPY = "Copyright © 2014 Teltek Video Research"
 WEB = "http://galicaster.teltek.es"
 LICENSE = """
 Galicaster, Multistream Recorder and Player
-Copyright (c) 2011, Teltek Video Research <galicaster@teltek.es>
+Copyright (c) 2014, Teltek Video Research <galicaster@teltek.es>
 
 This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License. 
 To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/3.0/ 
@@ -36,18 +36,21 @@ or send a letter to Creative Commons, 171 Second Street, Suite 300, San Francisc
 
 AUTHORS = [
 "Héctor Canto",
-"Rubén González"
+"Hugo Caloto",
+"Rubén González",
+"Rubén Pérez"
 ]
 
 DOCS = (
 "Héctor Canto",
+"Hugo Caloto",
 "Rubén González",
 "Rubén Pérez"
 )
 
 ARTISTS = [
-"Natalia García",
-"Héctor Canto"
+"Héctor Canto",
+"Natalia García"
 ]
 
 class GCAboutDialog(gtk.AboutDialog):
@@ -65,9 +68,9 @@ class GCAboutDialog(gtk.AboutDialog):
          k = size[0]/1920.0
          self.set_resizable(True)
          self.set_default_size(int(0.3*size[0]),int(0.4*size[1]))
-         self.set_title("About Galicaster "+__version__)
+         self.set_title(_("About Galicaster {version}").format(version = __version__))
          
-         strip = Header(size=size, title="About")
+         strip = Header(size=size, title=_("About"))
          self.vbox.pack_start(strip, False, True, 0)
          self.vbox.reorder_child(strip,0)
          strip.show()
@@ -79,11 +82,11 @@ class GCAboutDialog(gtk.AboutDialog):
          self.set_program_name(PROGRAM)
          self.set_version(__version__)
          self.set_website(WEB)
-         self.set_website_label("Galicaster Website")
+         self.set_website_label(_("Galicaster Website"))
          self.set_authors(AUTHORS)
          self.set_documenters(DOCS)
          self.set_artists(ARTISTS)
-         self.set_copyright("\n".join((COPY1,COPY2)))
+         self.set_copyright(COPY)
          self.set_license(LICENSE)
          pixbuf = gtk.gdk.pixbuf_new_from_file(get_image_path('logo.svg')) 
          pixbuf = pixbuf.scale_simple(
@@ -115,14 +118,12 @@ class GCAboutDialog(gtk.AboutDialog):
          #buttons.reorder_child(thanks,0)
          #thanks.show()
          
-         self.show_all()
-         self.present()
-         self.run()
-         self.destroy()
+         #self.run()
+         #self.destroy()
 
      def show_thanks(self, orgin):
          dialog = gtk.Dialog()
-         dialog.set_title("Special thanks to...")
+         dialog.set_title(_("Special thanks to..."))
          dialog.add_button("Close",gtk.RESPONSE_CLOSE)
          dialog.set_default_size(350,150)
          dialog.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_SPLASHSCREEN)
@@ -136,8 +137,8 @@ class GCAboutDialog(gtk.AboutDialog):
          box.pack_start(align, True, True, 0)
          align.show()
          label.show()
-         dialog.run()
-         dialog.destroy()
+         #dialog.run()
+         #dialog.destroy()
 
 
 
