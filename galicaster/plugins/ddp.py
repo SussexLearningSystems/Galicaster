@@ -72,6 +72,8 @@ class DDP(Thread):
     self.stop_update_screenshots = None
     self.capture_watchid = None
     self.boost_watchid = None
+    self._user = conf.get('ddp', 'user')
+    self._password = conf.get('ddp', 'password')
 
     dispatcher.connect('update-rec-vumeter', self.vumeter)
 
@@ -148,11 +150,11 @@ class DDP(Thread):
 
   def subscription_callback(self, error):
     if error:
-      print '*** ERROR: ' + error
+      print '*** ERROR: ', error
 
   def update_callback(self, error, data):
     if error:
-      print '*** ERROR: ' + error
+      print '*** ERROR: ', error
       return
     print '*** DATA: ', data
 
@@ -160,7 +162,7 @@ class DDP(Thread):
     me = self.client.find_one('rooms')
     audio = self.read_audio_settings()
     if me and self.connected:
-      self.client.update('rooms', {'_id': self.id}, {'displayName': self.displayName, 'audio': audio, 'ip': self.ip},
+      self.client.update('rooms', {'_id': self.id}, {'$set': {'displayName': self.displayName, 'audio': audio, 'ip': self.ip}},
                          callback=self.update_callback)
     elif self.connected:
       self.client.insert('rooms', {'_id': self.id, 'displayName': self.displayName, 'audio': audio, 'ip': self.ip})
@@ -178,6 +180,8 @@ class DDP(Thread):
   def on_connected(self):
     logger.info('Connected to Meteor')
     self.connected = True
+    self.client.login(self._user, self._password)
+
     if self.stop_update_screenshots:
       self.stop_update_screenshots()
 
