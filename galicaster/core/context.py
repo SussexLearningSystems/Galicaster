@@ -98,8 +98,10 @@ def get_mhclient():
                                     connect_timeout,
                                     timeout,
                                     conf.get('ingest', 'workflow'),
-                                    conf.get('ingest', 'workflow-parameters'),
-                                    get_logger() )
+                                    conf.get_dict('ingest', 'workflow-parameters'),
+                                    conf.get_dict('ingest', 'ca-parameters'),
+                                    get_repository(),
+                                    get_logger())
         else:
             mhclient = None
         __galicaster_context['mhclient'] = mhclient
@@ -127,12 +129,14 @@ def get_repository():
         if template is None:
             __galicaster_context['repository'] = Repository(
                 conf.get('basic', 'repository'), 
-                conf.hostname)
+                conf.hostname,
+                logger=get_logger())
         else:
             __galicaster_context['repository'] = Repository(
                 conf.get('basic', 'repository'), 
                 conf.hostname,
-                conf.get('repository', 'foldertemplate'))
+                conf.get('repository', 'foldertemplate'),
+                get_logger())
 
     return __galicaster_context['repository']
 
@@ -150,7 +154,9 @@ def get_worker():
                                                 get_conf().get('basic', 'export'),
                                                 get_conf().get('basic', 'tmp'),
                                                 not legacy,
-                                                get_conf().get('sidebyside', 'layout'))
+                                                get_conf().get('sidebyside', 'layout'),
+                                                get_conf().get_list('operations', 'hide'),
+                                                get_conf().get_list('operations', 'hide_nightly'))
 
     return __galicaster_context['worker']
 

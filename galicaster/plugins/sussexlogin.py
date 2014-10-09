@@ -54,15 +54,6 @@ conf = context.get_conf()
 dispatcher = context.get_dispatcher()
 is_admin = conf.is_admin_blocked()
 
-recorderui = context.get_mainwindow().nbox.get_nth_page(0).gui
-rec_button = recorderui.get_object('recbutton')
-edit_button = recorderui.get_object('editbutton')
-help_button = recorderui.get_object('helpbutton')
-data_panel = recorderui.get_object('data_panel')
-rec_tab = recorderui.get_object('tab2')
-rec_title = recorderui.get_object('recording1')
-rec_duration = recorderui.get_object('recording3')
-
 def init():
     global timeout
     global cam_available, cam_profile, nocam_profile
@@ -74,7 +65,7 @@ def init():
         
     except ValueError:
         pass
-    
+
     cam_available = conf.get('sussexlogin', 'cam_available') or cam_available
     cam_available = True if cam_available in ('True', 'true', True) else False
     logger.info("cam_available set to: %r", cam_available)
@@ -89,13 +80,7 @@ def init():
     fsize = int(fsize)
     logger.info("font_size set to: %s", fsize)
 
-    edit_button.hide()
-    rec_button.hide()
-    help_button.hide()
-    data_panel.remove_page(0)
-    data_panel.remove_page(1)
-    rec_tab.set_text('')
-    
+
 def event_change_mode(orig, old_state, new_state):
     """
     On changing mode, if the new area is right, shows dialog if necessary
@@ -125,8 +110,9 @@ def show_login(element=None):
         else:
             sussex_login_dialog = LoginDialog()
         waiting_for_details = True
-        rec_title.set_text('Not recording')
-        rec_duration.set_text('')
+        recorder_ui = context.get_mainwindow().nbox.get_nth_page(0).gui
+        recorder_ui.get_object('recording1').set_text('Not recording')
+        recorder_ui.get_object('recording3').set_text('')
         if cam_available:
             switch_profile(cam_profile)
         elif (profile == cam_profile) or not cam_available:
@@ -429,6 +415,7 @@ def start_recording(user, title, module, profile):
     then emitting a 'start-before' signal.
     """
     global trigger_recording
+    switch_profile(profile)
     repo = context.get_repository()
     if user:
         pres = user['user_name']

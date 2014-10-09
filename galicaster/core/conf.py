@@ -84,11 +84,29 @@ class Conf(object): # TODO list get and other ops arround profile
        return True if self.get_lower(sect, opt) in YES else False
 
 
+   def get_list(self, sect, opt):
+       """
+       Return list value of option in section
+       key = value1 value2 value2
+       """
+       return self.get(sect, opt).split() if self.get(sect, opt) else []
+
+
+   def get_dict(self, sect, opt):
+       """
+       Return dict value of option in section
+       key = key1:value1;key2:value2
+       """
+       return dict(item.split(":") for item in self.get(sect, opt).split(";")) if self.get(sect, opt) else {}
+
    def get_section(self, sect):
        """
        Returns a dictionay instead of a list
        """
-       return dict(self.__conf.items(sect))
+       try:
+          return dict(self.__conf.items(sect))
+       except ConfigParser.NoSectionError:
+          return {}
 
 
    def set(self, sect, opt, value):
@@ -202,9 +220,8 @@ class Conf(object): # TODO list get and other ops arround profile
       profile.name = 'Default'
       profile.import_tracks_from_parser(parser)
       if activated:
-         for track in profile.tracks:
-            if track['active'].lower() not in YES:
-               profile.tracks.remove(track)
+         def f(x): return x.get('active', 'true').lower() in YES
+         profile.tracks = filter(f, profile.tracks)
       return profile
 
 
@@ -243,7 +260,7 @@ class Conf(object): # TODO list get and other ops arround profile
          self.__current_profile = profile_list[current]
       except:
          if self.logger:
-            self.logger.error("Forcing default profile since current doesn't exits")
+            self.logger.error("Forcing default profile since current doesn't exist")
          self.__current_profile = self.__default_profile
 
       return profile_list
@@ -406,16 +423,6 @@ class Profile(object):
       configfile = open(filepath, 'wb')
       parser.write(configfile)
       configfile.close()
-
-   def get_video_areas(self):
-      # TODO filter not showable areas
-      areas = {}
-      index = 1
-      for track in self.tracks:
-         if track.device not in ['pulse', 'audiotest']:
-            areas[index] = track.name
-            index +=1                             
-      return areas
 
 
 

@@ -35,3 +35,6 @@ tests/resources/profile/folder/
 conf.ini
 conf-dist.ini
 *.OLD
+
+# IDE project files
+nbproject/
