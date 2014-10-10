@@ -76,10 +76,15 @@ class DDP(Thread):
     self._password = conf.get('ddp', 'password')
 
     dispatcher.connect('update-rec-vumeter', self.vumeter)
+    dispatcher.connect('galicaster-notify-timer-short', self.heartbeat)
 
   def run(self):
     self.client.connect()
     self.client.subscribe('GalicasterControl', params=[self.id], callback=self.subscription_callback)
+
+  def heartbeat(self, element):
+    if self.connected:
+      self.client.update('rooms', {'_id': self.id}, {'$set': {'heartbeat': int(time.time())}})
 
   def is_recording(self):
     me = self.client.find_one('rooms')
