@@ -221,6 +221,7 @@ class DDP(Thread):
     audio_settings = {}
     audio_settings['capture'] = self.control_values(self.capture_mixer)
     audio_settings['rearMicBoost'] = self.control_values(self.boost_mixer)
+    self.capture_mixer.setrec(1)
     return audio_settings
 
   def control_values(self, mixer):
