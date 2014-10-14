@@ -1,3 +1,4 @@
+import calendar
 import alsaaudio
 import base64
 import cStringIO
@@ -173,7 +174,8 @@ class DDP(Thread):
     duration = mp.getDuration()
     line["duration"] = long(duration/1000) if duration else None
     # Does series_title need sanitising as well as duration?
-    line["created"] = mp.getStartDateAsString()
+    created = mp.getDate()
+    line["created"] = calendar.timegm(created.utctimetuple())
     for key,value in mp.metadata_series.iteritems():
         line["series_"+key] = value
     for key,value in line.iteritems():
