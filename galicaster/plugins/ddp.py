@@ -194,11 +194,11 @@ class DDP(Thread):
 
   def on_subscribed(self, subscription):
     me = self.client.find_one('rooms')
-    audio = self.read_audio_settings()
     if me and self.connected:
-      self.client.update('rooms', {'_id': self.id}, {'$set': {'displayName': self.displayName, 'audio': audio, 'ip': self.ip}},
+      self.client.update('rooms', {'_id': self.id}, {'$set': {'displayName': self.displayName, 'ip': self.ip}},
                          callback=self.update_callback)
     elif self.connected:
+      audio = self.read_audio_settings()
       self.client.insert('rooms', {'_id': self.id, 'displayName': self.displayName, 'audio': audio, 'ip': self.ip})
 
   def on_changed(self, collection, id, fields, cleared):
