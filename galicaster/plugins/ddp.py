@@ -78,8 +78,7 @@ class DDP(Thread):
 
     dispatcher.connect('update-rec-vumeter', self.vumeter)
     dispatcher.connect('galicaster-notify-timer-short', self.heartbeat)
-    dispatcher.connect('galicaster-notify-timer-long', self.repository)
-    dispatcher.connect('start-before', self.recording)
+    dispatcher.connect('start-before', self.on_start_recording)
     dispatcher.connect('restart-preview', self.on_stop_recording)
 
   def run(self):
@@ -90,7 +89,7 @@ class DDP(Thread):
     if self.connected:
       self.client.update('rooms', {'_id': self.id}, {'$set': {'heartbeat': int(time.time())}})
 
-  def recording(self, sender, id):
+  def on_start_recording(self, sender, id):
     media_package = self.media_package_metadata(id)
     self.client.update('rooms', {'_id': self.id},
       {'$set': {'currentMediaPackage': media_package}}
@@ -182,13 +181,6 @@ class DDP(Thread):
         if value in [None,[]]:
             line[key]=''
     return line
-
-  def repository(self, sender=None):
-    repo = context.get_repository()
-    keys = []
-    for key,value in repo.iteritems():
-        keys.append(self.media_package_metadata(key))
-    self.client.update('rooms', {'_id': self.id}, {'$set': {'repository': keys}})
 
   def subscription_callback(self, error):
     if error:
