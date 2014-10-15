@@ -1,3 +1,4 @@
+import calendar
 import alsaaudio
 import base64
 import cStringIO
@@ -77,6 +78,8 @@ class DDP(Thread):
 
     dispatcher.connect('update-rec-vumeter', self.vumeter)
     dispatcher.connect('galicaster-notify-timer-short', self.heartbeat)
+    dispatcher.connect('start-before', self.on_start_recording)
+    dispatcher.connect('restart-preview', self.on_stop_recording)
 
   def run(self):
     self.client.connect()
@@ -85,6 +88,17 @@ class DDP(Thread):
   def heartbeat(self, element):
     if self.connected:
       self.client.update('rooms', {'_id': self.id}, {'$set': {'heartbeat': int(time.time())}})
+
+  def on_start_recording(self, sender, id):
+    media_package = self.media_package_metadata(id)
+    self.client.update('rooms', {'_id': self.id},
+      {'$set': {'currentMediaPackage': media_package}}
+    )
+
+  def on_stop_recording(self, sender=None):
+    self.client.update('rooms', {'_id': self.id},
+      {'$set': {'currentMediaPackage': None}}
+    )
 
   def is_recording(self):
     me = self.client.find_one('rooms')
@@ -152,6 +166,21 @@ class DDP(Thread):
         self.client.update('rooms', {'_id': self.id}, {'$set': update})
 
     self.do_vu = (self.do_vu + 1) % 4
+
+  def media_package_metadata(self, id):
+    mp = context.get_repository().get(id)
+    line = mp.metadata_episode.copy()
+    duration = mp.getDuration()
+    line["duration"] = long(duration/1000) if duration else None
+    # Does series_title need sanitising as well as duration?
+    created = mp.getDate()
+    line["created"] = calendar.timegm(created.utctimetuple())
+    for key,value in mp.metadata_series.iteritems():
+        line["series_"+key] = value
+    for key,value in line.iteritems():
+        if value in [None,[]]:
+            line[key]=''
+    return line
 
   def subscription_callback(self, error):
     if error:

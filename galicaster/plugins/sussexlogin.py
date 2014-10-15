@@ -341,6 +341,9 @@ class EnterDetails(gtk.Window):
         iter = self.module.get_active_iter()
         if iter:
             mod = self.liststore.get(iter, 0, 1)
+            # If no module selected, set module title to nothing.
+            if mod[1] == '':
+              mod = ('', '')
         name = self.t.get_text() or 'Unknown'
         cam = self.cam.get_active() if cam_available else False
         profile = cam_profile if cam else nocam_profile
