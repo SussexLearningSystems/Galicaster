@@ -177,8 +177,6 @@ class DDP(Thread):
     created = mp.getDate()
     line["created"] = calendar.timegm(created.utctimetuple())
     for key,value in mp.metadata_series.iteritems():
-        if key == 'title' and value == 'Choose a Module...':
-          value = None
         line["series_"+key] = value
     for key,value in line.iteritems():
         if value in [None,[]]:
