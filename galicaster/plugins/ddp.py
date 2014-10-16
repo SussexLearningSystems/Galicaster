@@ -75,11 +75,13 @@ class DDP(Thread):
     self.boost_watchid = None
     self._user = conf.get('ddp', 'user')
     self._password = conf.get('ddp', 'password')
+    self.paused = False
 
     dispatcher.connect('update-rec-vumeter', self.vumeter)
     dispatcher.connect('galicaster-notify-timer-short', self.heartbeat)
     dispatcher.connect('start-before', self.on_start_recording)
     dispatcher.connect('restart-preview', self.on_stop_recording)
+    dispatcher.connect('update-rec-status', self.on_rec_status_update)
 
   def run(self):
     self.client.connect()
@@ -164,8 +166,13 @@ class DDP(Thread):
       update.update(self.is_recording())
       if self.connected:
         self.client.update('rooms', {'_id': self.id}, {'$set': update})
-
     self.do_vu = (self.do_vu + 1) % 4
+
+  def on_rec_status_update(self, element, data):
+    is_paused = data == 'Paused'
+    if self.paused != is_paused and self.connected:
+      self.client.update('rooms', {'_id': self.id}, {'$set': {'paused': is_paused}})
+      self.paused = is_paused
 
   def media_package_metadata(self, id):
     mp = context.get_repository().get(id)
@@ -195,11 +202,25 @@ class DDP(Thread):
   def on_subscribed(self, subscription):
     me = self.client.find_one('rooms')
     if me and self.connected:
-      self.client.update('rooms', {'_id': self.id}, {'$set': {'displayName': self.displayName, 'ip': self.ip}},
+      self.client.update('rooms', {'_id': self.id},
+                         {'$set': {'displayName': self.displayName,
+                                   'ip': self.ip,
+                                   'paused': False,
+                                   'recording': False,
+                                   'heartbeat': int(time.time())
+                                   }
+                         },
                          callback=self.update_callback)
     elif self.connected:
       audio = self.read_audio_settings()
-      self.client.insert('rooms', {'_id': self.id, 'displayName': self.displayName, 'audio': audio, 'ip': self.ip})
+      self.client.insert('rooms', {'_id': self.id,
+                                   'displayName': self.displayName,
+                                   'audio': audio,
+                                   'ip': self.ip,
+                                   'paused': False,
+                                   'recording': False,
+                                   'heartbeat': int(time.time())
+                                  })
 
   def on_changed(self, collection, id, fields, cleared):
     me = self.client.find_one('rooms')
