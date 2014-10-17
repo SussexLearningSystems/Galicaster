@@ -231,6 +231,14 @@ class DDP(Thread):
       (float(me['audio']['rearMicBoost']['value']['left']) / float(me['audio']['rearMicBoost']['limits']['max'])) * 100)
     self.boost_mixer.setvolume(level, 0, 'capture')
     self.boost_mixer.setvolume(level, 1, 'capture')
+    if context.get_state().is_recording:
+      if self.paused != me['paused']:
+        self.set_paused(me['paused'])
+
+  def set_paused(self, new_status):
+    self.paused = new_status
+    print new_status
+    dispatcher.emit("toggle-pause-rec")
 
   def on_connected(self):
     logger.info('Connected to Meteor')
