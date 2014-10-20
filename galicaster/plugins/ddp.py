@@ -76,6 +76,7 @@ class DDP(Thread):
     self._user = conf.get('ddp', 'user')
     self._password = conf.get('ddp', 'password')
     self.paused = False
+    self.recording = False
 
     dispatcher.connect('update-rec-vumeter', self.vumeter)
     dispatcher.connect('galicaster-notify-timer-short', self.heartbeat)
@@ -234,11 +235,18 @@ class DDP(Thread):
     if context.get_state().is_recording:
       if self.paused != me['paused']:
         self.set_paused(me['paused'])
+      if self.recording != me['recording']:
+        self.set_recording(me)
 
   def set_paused(self, new_status):
     self.paused = new_status
     print new_status
     dispatcher.emit("toggle-pause-rec")
+
+  def set_recording(self, me):
+    self.recording = me['recording']
+    if not me['recording']:
+      dispatcher.emit("stop-record", '')
 
   def on_connected(self):
     logger.info('Connected to Meteor')
