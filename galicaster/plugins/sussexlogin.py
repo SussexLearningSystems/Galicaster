@@ -54,6 +54,7 @@ conf = context.get_conf()
 dispatcher = context.get_dispatcher()
 is_admin = conf.is_admin_blocked()
 
+
 def init():
     global timeout
     global cam_available, cam_profile, nocam_profile
@@ -80,6 +81,8 @@ def init():
     fsize = int(fsize)
     logger.info("font_size set to: %s", fsize)
 
+    dispatcher.add_new_signal('sussexlogin-record', True)
+    dispatcher.connect('sussexlogin-record', start_recording)
 
 def event_change_mode(orig, old_state, new_state):
     """
@@ -347,7 +350,7 @@ class EnterDetails(gtk.Window):
         name = self.t.get_text() or 'Unknown'
         cam = self.cam.get_active() if cam_available else False
         profile = cam_profile if cam else nocam_profile
-        start_recording(self.u, name, mod, profile)
+        dispatcher.emit('sussexlogin-record', (self.u, name, mod, profile))
 
         waiting_for_details = False
         self.destroy()
@@ -412,12 +415,23 @@ def get_user_details(user=None):
 
         return u
         
-def start_recording(user, title, module, profile):
+def start_recording(orig, metadata):
     """
     start a recording by adding a mediapackage to the repo with the correct metadata
     then emitting a 'start-before' signal.
     """
-    global trigger_recording
+    global trigger_recording, waiting_for_details, ed
+
+    waiting_for_details = False
+
+    user, title, module, profile = metadata
+
+    if sussex_login_dialog:
+      sussex_login_dialog.hide()
+
+    if ed:
+      ed.hide()
+
     switch_profile(profile)
     repo = context.get_repository()
     if user:

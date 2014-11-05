@@ -232,20 +232,26 @@ class DDP(Thread):
       (float(me['audio']['rearMicBoost']['value']['left']) / float(me['audio']['rearMicBoost']['limits']['max'])) * 100)
     self.boost_mixer.setvolume(level, 0, 'capture')
     self.boost_mixer.setvolume(level, 1, 'capture')
-    if context.get_state().is_recording:
-      if self.paused != me['paused']:
-        self.set_paused(me['paused'])
-      if self.recording != me['recording']:
-        self.set_recording(me)
+    if self.recording and self.paused != me['paused']:
+      self.set_paused(me['paused'])
+    if self.recording != me['recording']:
+      self.set_recording(me)
 
   def set_paused(self, new_status):
     self.paused = new_status
-    print new_status
     dispatcher.emit("toggle-pause-rec")
 
   def set_recording(self, me):
     self.recording = me['recording']
-    if not me['recording']:
+    if self.recording:
+      meta = me['currentMediaPackage']
+      dispatcher.emit('sussexlogin-record',
+                      ({'user_name': meta['creator'],
+                        'user_id': meta['rightsHolder']},
+                       meta['title'],
+                       (meta['series_title'], meta['isPartOf']),
+                       me['currentProfile']))
+    else:
       dispatcher.emit("stop-record", '')
 
   def on_connected(self):
