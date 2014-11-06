@@ -73,7 +73,7 @@ rec_duration = recorderui.get_object('recording3')
 def init():
     global timeout
     global cam_available, cam_profile, nocam_profile, camonly_profile, twocams_profile
-    global matrix_ip, matrix_port, matrix_outs, matrix_cam_labels
+    global matrix_ip, matrix_port, matrix_retries, matrix_outs, matrix_cam_labels
     global fsize
     try:
         dispatcher.connect('galicaster-status', event_change_mode)
@@ -112,12 +112,13 @@ def init():
       outs = conf.get('sussexlogin', 'matrix_outs')
       if outs:
         matrix_outs = outs.split(',')
-        matrix_outs = [int(x) for x in outs]
-      logger.info("matrix_outs set to: [%s]", ', '.join('%d' % m for m in matrix_outs))
+        matrix_outs = [int(x) for x in matrix_outs]
+      matrix_outs_str = ', '.join("%d" % m for m in matrix_outs)
+      logger.info("matrix_outs set to: [%s]", matrix_outs_str)
 
       labels = conf.get('sussexlogin', 'matrix_cam_labels')
       if labels:
-        matrix_cam_labels = labels.split(',')
+        matrix_cam_labels = [l.strip() for l in labels.split(',')]
       logger.info("matrix_cam_labels set to: [%s]", ', '.join(matrix_cam_labels))
 
       matrix_ip = conf.get('sussexlogin', 'matrix_ip') or matrix_ip
@@ -305,9 +306,8 @@ class EnterDetails(gtk.Window):
         hbox2 = gtk.HBox()
         hbox3 = gtk.HBox()
 
-        liststore = liststore = gtk.ListStore(str,str)
-        self.liststore = liststore
-        liststore.append(['Choose a Module...', ''])
+        self.module_liststore = gtk.ListStore(str,str)
+        self.module_liststore.append(['Choose a Module...', ''])
         presenter = "Enter Details"
         photo = gtk.Image()
         
@@ -323,14 +323,14 @@ class EnterDetails(gtk.Window):
             if u['modules']:
                 #sort modules by name before adding to liststore
                 for series_id, series_name in sorted(u['modules'].items(), key=itemgetter(1)):
-                    liststore.append([series_name, series_id])
+                    self.module_liststore.append([series_name, series_id])
  
         strip = Header(size=(width, height), title=presenter)
         vbox.pack_start(strip, True, True, 0)
 
         cell = gtk.CellRendererText()
         cell.set_property('font-desc', fdesc)
-        self.module = gtk.ComboBox(liststore)
+        self.module = gtk.ComboBox(self.module_liststore)
         self.module.pack_start(cell, True)
         self.module.add_attribute(cell, 'text', 0)
         self.module.set_active(0)
@@ -339,12 +339,6 @@ class EnterDetails(gtk.Window):
         title.modify_font(fdesc)
         self.t = title
 
-        if cam_available:
-            cam = gtk.CheckButton(label='Camera')
-            cam.connect('clicked', self._toggled)
-            cam.child.set_attributes(attr)
-            self.cam = cam
-        
         rec_image = gtk.Image()
         icon = gtk.icon_theme_get_default().load_icon('media-record', 
                                                       int(fsize * 1.5), 
@@ -369,8 +363,34 @@ class EnterDetails(gtk.Window):
         cancel.child.set_padding(-1, int(fsize / 2.5))
 
         hbox2.pack_start(title)
-        if cam_available:
+        if cam_available == 1:
+            cam = gtk.CheckButton(label='Camera')
+            cam.connect('clicked', self._toggled)
+            cam.child.set_attributes(attr)
+            self.cam = cam
             hbox2.pack_start(cam, False, False, 5)
+        elif cam_available == 2:
+            self.cam1_liststore = gtk.ListStore(str,int)
+            self.cam1_liststore.append(['Presentation', -1])
+            for output, cam in enumerate(matrix_cam_labels):
+                self.cam1_liststore.append([cam, output])
+            self.cam1 = gtk.ComboBox(self.cam1_liststore)
+            self.cam1.pack_start(cell, True)
+            self.cam1.add_attribute(cell, 'text', 0)
+            self.cam1.set_active(0)
+            hbox2.pack_start(self.cam1, False, False, 5)
+
+            self.cam2_liststore = gtk.ListStore(str,int)
+            self.cam2_liststore.append(['', -1])
+            for output, cam in enumerate(matrix_cam_labels):
+                self.cam2_liststore.append([cam, output])
+            self.cam2 = gtk.ComboBox(self.cam2_liststore)
+            self.cam2.pack_start(cell, True)
+            self.cam2.add_attribute(cell, 'text', 0)
+            self.cam2.set_active(0)
+            hbox2.pack_start(self.cam2, False, False, 5)
+
+
         hbox3.pack_start(record, padding=5)
         hbox3.pack_start(cancel, padding=5)
         if u and u['modules']:
@@ -397,7 +417,7 @@ class EnterDetails(gtk.Window):
         mod = None
         iter = self.module.get_active_iter()
         if iter:
-            mod = self.liststore.get(iter, 0, 1)
+            mod = self.module_liststore.get(iter, 0, 1)
         name = self.t.get_text() or 'Unknown'
         cam = self.cam.get_active() if cam_available else False
         profile = cam_profile if cam else nocam_profile
@@ -513,7 +533,7 @@ def on_update_pipeline(source, old, new):
         time.sleep(0.5)
         
         profile = conf.get('basic','profile')
-        if ed and cam_available:
+        if ed and cam_available == 1:
             ed.cam.set_active(profile == cam_profile)
         if not waiting_for_details:
             show_login()
