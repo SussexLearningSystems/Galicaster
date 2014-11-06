@@ -379,6 +379,7 @@ class EnterDetails(gtk.Window):
             self.cam1.add_attribute(cell, 'text', 0)
             self.cam1.set_active(0)
             hbox2.pack_start(self.cam1, False, False, 5)
+            self.cam1.connect('changed', self._toggled)
 
             self.cam2_liststore = gtk.ListStore(str,int)
             self.cam2_liststore.append(['', -1])
@@ -389,6 +390,7 @@ class EnterDetails(gtk.Window):
             self.cam2.add_attribute(cell, 'text', 0)
             self.cam2.set_active(0)
             hbox2.pack_start(self.cam2, False, False, 5)
+            self.cam2.connect('changed', self._toggled)
 
 
         hbox3.pack_start(record, padding=5)
@@ -408,9 +410,31 @@ class EnterDetails(gtk.Window):
             switch_profile(nocam_profile)
 
     def _toggled(self, widget):
-        use_cam = widget.get_active()
-        profile = cam_profile if use_cam else nocam_profile
+        profile = self.which_profile()
         switch_profile(profile)
+
+    def which_profile(self):
+        profile = nocam_profile
+        if cam_available == 1:
+          profile = cam_profile if self.cam.get_active() else nocam_profile
+
+        if cam_available > 1:
+          cam1 = None
+          cam1_iter = self.cam1.get_active_iter()
+          if cam1_iter:
+            cam1 = self.cam1_liststore.get(cam1_iter, 0, 1)
+
+          cam2 = None
+          cam2_iter = self.cam2.get_active_iter()
+          if cam2_iter:
+            cam2 = self.cam2_liststore.get(cam2_iter, 0, 1)
+
+          if cam1[1] == -1:
+            profile = nocam_profile if cam2[1] == -1 else cam_profile
+          else:
+            profile = camonly_profile if cam2[1] == -1 else twocams_profile
+
+        return profile
         
     def do_record(self, button):
         global waiting_for_details
@@ -419,8 +443,8 @@ class EnterDetails(gtk.Window):
         if iter:
             mod = self.module_liststore.get(iter, 0, 1)
         name = self.t.get_text() or 'Unknown'
-        cam = self.cam.get_active() if cam_available else False
-        profile = cam_profile if cam else nocam_profile
+
+        profile = self.which_profile()
         start_recording(self.u, name, mod, profile)
 
         waiting_for_details = False
