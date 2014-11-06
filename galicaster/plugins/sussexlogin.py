@@ -40,7 +40,14 @@ from operator import itemgetter
 cam_available = True
 cam_profile = 'cam'
 nocam_profile = 'nocam'
+camonly_profile = 'camonly'
+twocams_profile = 'twocams'
 fsize = 50
+matrix_ip = ''
+matrix_port = 2006
+matrix_retries = 5
+matrix_outs = [2, 3]
+matrix_cam_labels = ['Judges', 'Left', 'Right']
 
 sussex_login_dialog = None
 waiting_for_details = False
@@ -65,7 +72,8 @@ rec_duration = recorderui.get_object('recording3')
 
 def init():
     global timeout
-    global cam_available, cam_profile, nocam_profile
+    global cam_available, cam_profile, nocam_profile, camonly_profile, twocams_profile
+    global matrix_ip, matrix_port, matrix_outs, matrix_cam_labels
     global fsize
     try:
         dispatcher.connect('galicaster-status', event_change_mode)
@@ -76,8 +84,13 @@ def init():
         pass
     
     cam_available = conf.get('sussexlogin', 'cam_available') or cam_available
-    cam_available = True if cam_available in ('True', 'true', True) else False
-    logger.info("cam_available set to: %r", cam_available)
+    if cam_available in ('True', 'true', True, '1', 1):
+      cam_available = 1
+    elif cam_available in ('False', 'false', False, '0', 0):
+      cam_available = 0
+    else:
+      cam_available = int(cam_available)
+    logger.info("cam_available set to: %d", cam_available)
         
     cam_profile = conf.get('sussexlogin', 'cam_profile') or cam_profile
     logger.info("cam_profile set to: %s", cam_profile)
@@ -89,13 +102,43 @@ def init():
     fsize = int(fsize)
     logger.info("font_size set to: %s", fsize)
 
+    if cam_available > 1:
+      camonly_profile = conf.get('sussexlogin', 'camonly_profile') or camonly_profile
+      logger.info("camonly_profile set to: %s", camonly_profile)
+
+      twocams_profile = conf.get('sussexlogin', 'twocams_profile') or twocams_profile
+      logger.info("twocams_profile set to: %s", twocams_profile)
+
+      outs = conf.get('sussexlogin', 'matrix_outs')
+      if outs:
+        matrix_outs = outs.split(',')
+        matrix_outs = [int(x) for x in outs]
+      logger.info("matrix_outs set to: [%s]", ', '.join('%d' % m for m in matrix_outs))
+
+      labels = conf.get('sussexlogin', 'matrix_cam_labels')
+      if labels:
+        matrix_cam_labels = labels.split(',')
+      logger.info("matrix_cam_labels set to: [%s]", ', '.join(matrix_cam_labels))
+
+      matrix_ip = conf.get('sussexlogin', 'matrix_ip') or matrix_ip
+      if matrix_ip:
+        logger.info("matrix_ip set to: %s", matrix_ip)
+
+      matrix_port = conf.get_int('sussexlogin', 'matrix_port') or matrix_port
+      logger.info("matrix_port set to: %d", matrix_port)
+
+      matrix_retries = conf.get_int('sussexlogin', 'matrix_retries') or matrix_retries
+      logger.info("matrix_retries set to: %d", matrix_retries)
+
     edit_button.hide()
     rec_button.hide()
     help_button.hide()
     data_panel.remove_page(0)
     data_panel.remove_page(1)
     rec_tab.set_text('')
-    
+
+
+
 def event_change_mode(orig, old_state, new_state):
     """
     On changing mode, if the new area is right, shows dialog if necessary
