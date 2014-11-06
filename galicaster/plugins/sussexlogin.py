@@ -516,6 +516,7 @@ def start_recording(user, title, module, profile):
     then emitting a 'start-before' signal.
     """
     global trigger_recording
+    switch_profile(profile)
     repo = context.get_repository()
     if user:
         pres = user['user_name']
