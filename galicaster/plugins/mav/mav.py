@@ -44,6 +44,8 @@ class MAV:
                 if re.match(expect, read):
                     return read
             except Exception as e:
+                self.conn.close()
+                self._connect()
                 error = e
                 time.sleep(.5)
             finally:
@@ -73,6 +75,13 @@ if __name__ == '__main__':
     port = 2006
 
     m = MAV(host, port)
+    print m.tie(3, 2)
+    print m.read_tie(2)
+    print m.tie(2, 2)
+    print m.read_tie(2)
+    print m.tie(1, 2)
+    print m.read_tie(2)
+    time.sleep(320)
     print m.tie(3, 2)
     print m.read_tie(2)
     print m.tie(2, 2)
