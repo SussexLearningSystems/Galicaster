@@ -439,6 +439,9 @@ class EnterDetails(gtk.Window):
           else:
             profile = camonly_profile if cam2[1] == -1 else twocams_profile
 
+        if profile == cam_profile:
+          return profile, cam2[1], None
+        
         return profile, cam1[1], cam2[1]
         
     def do_record(self, button):
