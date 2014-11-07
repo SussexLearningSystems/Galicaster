@@ -383,6 +383,7 @@ class EnterDetails(gtk.Window):
             self.cam1.pack_start(cell, True)
             self.cam1.add_attribute(cell, 'text', 0)
             self.cam1.set_active(0)
+            self.cam1.set_wrap_width(1)
             hbox2.pack_start(self.cam1, False, False, 5)
             self.cam1.connect('changed', self._toggled)
 
@@ -394,6 +395,7 @@ class EnterDetails(gtk.Window):
             self.cam2.pack_start(cell, True)
             self.cam2.add_attribute(cell, 'text', 0)
             self.cam2.set_active(0)
+            self.cam2.set_wrap_width(1)
             hbox2.pack_start(self.cam2, False, False, 5)
             self.cam2.connect('changed', self._toggled)
 
