@@ -441,7 +441,7 @@ class EnterDetails(gtk.Window):
 
         if profile == cam_profile:
           return profile, cam2[1], None
-        
+
         return profile, cam1[1], cam2[1]
         
     def do_record(self, button):
@@ -524,7 +524,7 @@ def start_recording(user, title, module, profile):
     then emitting a 'start-before' signal.
     """
     global trigger_recording
-    switch_profile(profile)
+    switch_profile(profile[0], profile[1], profile[2])
     repo = context.get_repository()
     if user:
         pres = user['user_name']
