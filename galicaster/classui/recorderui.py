@@ -1072,7 +1072,7 @@ class RecorderClassUI(gtk.Box):
         elif state == GC_PREVIEW:    
             record.set_sensitive( (self.allow_start or self.allow_manual) )
             pause.set_sensitive(False)
-            pause.set_active(False)
+            pause.set_sensitive(False)
             stop.set_sensitive(False)
             helpb.set_sensitive(True)
             prevb.set_sensitive(True)
@@ -1176,21 +1176,19 @@ class Pause(gtk.Window):
 
         self.par = parent
         width, height = parent.get_size()
-        self.wprop = width / 1920.0
-        self.hprop = height / 1080.0
 
         self.set_property("width-request", width / 4)
         self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_TOOLBAR)
         self.set_keep_above(True)
-        self.set_position(gtk.WIN_POS_NONE)
+        self.set_position(gtk.WIN_POS_CENTER_ALWAYS)
         self.set_modal(True)
 
         pause = gtk.Button()
         pause_image = gtk.Image()
         pixbuf = gtk.gdk.pixbuf_new_from_file(get_image_path('gc-pause.svg'))
         pixbuf = pixbuf.scale_simple(
-            width / 2,
-            height / 2,
+            width / 4,
+            width / 4,
             gtk.gdk.INTERP_BILINEAR)
         pause_image.set_from_pixbuf(pixbuf)
         pause.connect('clicked', self.do_unpause)
