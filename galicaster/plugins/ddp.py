@@ -244,13 +244,14 @@ class DDP(Thread):
   def set_recording(self, me):
     self.recording = me['recording']
     if self.recording:
-      meta = me['currentMediaPackage']
+      meta = me.get('currentMediaPackage', {}) or {}
+      profile = me.get('currentProfile', 'nocam')
+      series = (meta.get('series_title', ''), meta.get('isPartOf', ''))
+      user = {'user_name': meta.get('creator', ''),
+              'user_id': meta.get('rightsHolder', '')}
+      title = meta.get('title', 'Unknown')
       dispatcher.emit('sussexlogin-record',
-                      ({'user_name': meta['creator'],
-                        'user_id': meta['rightsHolder']},
-                       meta['title'],
-                       (meta['series_title'], meta['isPartOf']),
-                       me['currentProfile']))
+                      (user, title, series, profile))
     else:
       dispatcher.emit("stop-record", '')
 
