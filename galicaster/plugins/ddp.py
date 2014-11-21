@@ -78,6 +78,14 @@ class DDP(Thread):
     self.paused = False
     self.recording = False
 
+    cam_available = conf.get('sussexlogin', 'cam_available') or cam_available
+    if cam_available in ('True', 'true', True, '1', 1):
+      self.cam_available = 1
+    elif cam_available in ('False', 'false', False, '0', 0):
+      self.cam_available = 0
+    else:
+      self.cam_available = int(cam_available)
+
     dispatcher.connect('update-rec-vumeter', self.vumeter)
     dispatcher.connect('galicaster-notify-timer-short', self.heartbeat)
     dispatcher.connect('start-before', self.on_start_recording)
@@ -208,7 +216,8 @@ class DDP(Thread):
                                    'ip': self.ip,
                                    'paused': False,
                                    'recording': False,
-                                   'heartbeat': int(time.time())
+                                   'heartbeat': int(time.time()),
+                                   'camAvailable': self.cam_available
                                    }
                          },
                          callback=self.update_callback)
@@ -220,7 +229,8 @@ class DDP(Thread):
                                    'ip': self.ip,
                                    'paused': False,
                                    'recording': False,
-                                   'heartbeat': int(time.time())
+                                   'heartbeat': int(time.time()),
+                                   'camAvailable': self.cam_available
                                   })
 
   def on_changed(self, collection, id, fields, cleared):
