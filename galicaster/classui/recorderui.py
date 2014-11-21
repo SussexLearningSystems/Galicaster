@@ -181,6 +181,8 @@ class RecorderClassUI(gtk.Box):
 
         self.change_state(GC_READY)
 
+        self.pause_dialog = None
+
         self.proportion = 1
         self.on_start()
 
@@ -352,6 +354,7 @@ class RecorderClassUI(gtk.Box):
     def on_pause(self,button):
         """Pauses or resumes a recording"""
         if self.status == GC_PAUSED:
+            logger.debug("Resuming Recording")
             self.pause_dialog.do_unpause()
         elif self.status == GC_RECORDING:
             self.dispatcher.emit("disable-no-audio")
@@ -359,7 +362,8 @@ class RecorderClassUI(gtk.Box):
             self.change_state(GC_PAUSED)
             self.recorder.pause()
 
-            self.pause_dialog = Pause(self)
+            if not self.pause_dialog:
+                self.pause_dialog = Pause(self)
             self.pause_dialog.show()
 
     def on_ask_stop(self,button):
@@ -397,6 +401,10 @@ class RecorderClassUI(gtk.Box):
             self.error_dialog.dialog_destroy()
             self.error_dialog = None
             self.error_text = None
+
+        if self.pause_dialog:
+            self.pause_dialog.hide()
+
         self.recorder.stop_record_and_restart_preview()
         self.change_state(GC_STOP)
 
@@ -1104,8 +1112,6 @@ class RecorderClassUI(gtk.Box):
             self.dispatcher.emit("update-rec-status", "Paused")
             
         elif state == GC_STOP:
-            if self.previous == GC_PAUSED:
-                self.pause_dialog.destroy()
             record.set_sensitive(False)
             pause.set_sensitive(False)
             stop.set_sensitive(False)
@@ -1174,7 +1180,6 @@ class Pause(gtk.Window):
 
         self.recorder_ui = recorder_ui
 
-        self.par = parent
         width, height = parent.get_size()
 
         self.set_property("width-request", width / 4)
@@ -1201,7 +1206,7 @@ class Pause(gtk.Window):
         logger.debug("Resuming Recording")
         self.recorder_ui.recorder.resume()
         self.recorder_ui.change_state(GC_RECORDING)
-        self.destroy()
+        self.hide()
 
 
 gobject.type_register(RecorderClassUI)
