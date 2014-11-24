@@ -2,6 +2,7 @@ import calendar
 import alsaaudio
 import base64
 import cStringIO
+import requests
 import socket
 from threading import Event, Thread
 import time
@@ -69,12 +70,11 @@ class DDP(Thread):
     self.id = conf.get('ingest', 'hostname')
     self.capture_mixer = alsaaudio.Mixer(control='Capture')
     self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
-    self.old_videos = {}
-    self.stop_update_screenshots = None
     self.capture_watchid = None
     self.boost_watchid = None
     self._user = conf.get('ddp', 'user')
     self._password = conf.get('ddp', 'password')
+    self._http_host = conf.get('ddp', 'http_host')
 
     dispatcher.connect('update-rec-vumeter', self.vumeter)
     dispatcher.connect('galicaster-notify-timer-short', self.heartbeat)
@@ -87,6 +87,7 @@ class DDP(Thread):
 
   def heartbeat(self, element):
     if self.connected:
+      self.update_screenshots()
       self.client.update('rooms', {'_id': self.id}, {'$set': {'heartbeat': int(time.time())}})
 
   def on_start_recording(self, sender, id):
@@ -109,34 +110,24 @@ class DDP(Thread):
     return result
 
   def update_screenshots(self):
+    images = [
+      { 'type': 'presentation', 'file': '/tmp/SCREEN.avi.jpg' },
+      { 'type': 'presenter', 'file': '/tmp/CAMERA.avi.jpg' }
+    ]
+    files = {}
+    for image in images:
+      try:
+        files[image['type']] = (open(image['file'], 'rb'))
+      except IOError:
+        pass
     im = ImageGrab.grab(bbox=(10, 10, 1280, 720), backend='imagemagick')
     im.thumbnail((640, 360))
     output = cStringIO.StringIO()
     if im.mode != "RGB":
       im = im.convert("RGB")
     im.save(output, format="JPEG")
-    screen = 'data:image/jpeg;base64,' + base64.b64encode(output.getvalue())
-
-    try:
-      with open('/tmp/SCREEN.avi.jpg', mode='rb') as file:
-        presentationVideo = 'data:image/jpeg;base64,' + base64.b64encode(file.read())
-    except IOError:
-      presentationVideo = ''
-
-    try:
-      with open('/tmp/CAMERA.avi.jpg', mode='rb') as file:
-        presenterVideo = 'data:image/jpeg;base64,' + base64.b64encode(file.read())
-    except IOError:
-      presenterVideo = ''
-
-    videos = {'screen': screen,
-              'presentationVideo': presentationVideo,
-              'presenterVideo': presenterVideo}
-
-    set = {'$set': dict_diff(self.old_videos, videos)}
-    if self.connected:
-      self.client.update('rooms', {'_id': self.id}, set)
-    self.old_videos = videos
+    files['screen'] = ('screen.jpg', output.getvalue())
+    requests.post("%s/image/%s" % (self._http_host, self.id), files=files)
 
   def mixer_changed(self, source=None, condition=None, reopen=True):
     if reopen:
@@ -216,8 +207,7 @@ class DDP(Thread):
     self.connected = True
     self.client.login(self._user, self._password)
 
-    if self.stop_update_screenshots:
-      self.stop_update_screenshots()
+    self.update_screenshots()
 
     if not self.capture_watchid:
       fd, eventmask = self.capture_mixer.polldescriptors()[0]
@@ -226,13 +216,8 @@ class DDP(Thread):
       fd, eventmask = self.boost_mixer.polldescriptors()[0]
       self.boost_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
 
-    self.old_videos = {}
-    self.stop_update_screenshots = call_repeatedly(1, self.update_screenshots)
-
   def on_closed(self, code, reason):
     logger.error('Disconnected from Meteor: err %d - %s' % (code, reason))
-    if self.stop_update_screenshots:
-      self.stop_update_screenshots()
     self.connected = False
 
   def update_audio(self):
