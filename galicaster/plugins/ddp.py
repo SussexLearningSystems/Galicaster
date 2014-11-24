@@ -112,14 +112,14 @@ class DDP(Thread):
 
   def update_screenshots(self):
     images = [
-      { 'type': 'presentation', 'file': '/tmp/SCREEN.avi.jpg' },
-      { 'type': 'presenter', 'file': '/tmp/CAMERA.avi.jpg' }
+      { 'type': 'presentation', 'filename': 'screen.jpg', 'file': '/tmp/SCREEN.avi.jpg' },
+      { 'type': 'presenter', 'filename': 'camera.jpg', 'file': '/tmp/CAMERA.avi.jpg' }
     ]
     files = {}
     for image in images:
       try:
         if(os.path.getctime(image['file']) > time.time() - 3):
-          files[image['type']] = (open(image['file'], 'rb'))
+          files[image['type']] = (image['filename'], open(image['file'], 'rb'), 'image/jpeg')
       except IOError:
         pass
     im = ImageGrab.grab(bbox=(10, 10, 1280, 720), backend='imagemagick')
@@ -128,7 +128,7 @@ class DDP(Thread):
     if im.mode != "RGB":
       im = im.convert("RGB")
     im.save(output, format="JPEG")
-    files['screen'] = ('screen.jpg', output.getvalue())
+    files['screen'] = ('screen.jpg', output.getvalue(), 'image/jpeg')
     requests.post("%s/image/%s" % (self._http_host, self.id), files=files)
 
   def mixer_changed(self, source=None, condition=None, reopen=True):
