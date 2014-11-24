@@ -2,6 +2,7 @@ import calendar
 import alsaaudio
 import base64
 import cStringIO
+import os
 import requests
 import socket
 from threading import Event, Thread
@@ -117,7 +118,8 @@ class DDP(Thread):
     files = {}
     for image in images:
       try:
-        files[image['type']] = (open(image['file'], 'rb'))
+        if(os.path.getctime(image['file']) > time.time() - 3):
+          files[image['type']] = (open(image['file'], 'rb'))
       except IOError:
         pass
     im = ImageGrab.grab(bbox=(10, 10, 1280, 720), backend='imagemagick')
