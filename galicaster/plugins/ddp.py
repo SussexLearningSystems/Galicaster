@@ -137,7 +137,10 @@ class DDP(Thread):
       im = im.convert("RGB")
     im.save(output, format="JPEG")
     files['screen'] = ('screen.jpg', output.getvalue(), 'image/jpeg')
-    requests.post("%s/image/%s" % (self._http_host, self.id), files=files)
+    try:
+      requests.post("%s/image/%s" % (self._http_host, self.id), files=files)
+    except Exception:
+      logger.warn('Unable to post images')
 
   def mixer_changed(self, source=None, condition=None, reopen=True):
     if reopen:
