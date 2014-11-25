@@ -62,7 +62,6 @@ class DDP(Thread):
     self.client.on('reconnected', self.on_connected)
     self.client.on('closed', self.on_closed)
 
-    self.connected = False
     self.displayName = conf.get('sussexlogin', 'room_name')
     self.vu_min = -70
     self.vu_range = 40
@@ -101,19 +100,19 @@ class DDP(Thread):
       logger.warn('DDP connection failed')
 
   def heartbeat(self, element):
-    if self.connected:
+    if self.client.connected:
       self.update_screenshots()
       self.client.update('rooms', {'_id': self.id}, {'$set': {'heartbeat': int(time.time())}})
 
   def on_start_recording(self, sender, id):
     media_package = self.media_package_metadata(id)
-    if self.connected:
+    if self.client.connected:
       self.client.update('rooms', {'_id': self.id},
         {'$set': {'currentMediaPackage': media_package, 'recording': True}}
       )
 
   def on_stop_recording(self, sender=None):
-    if self.connected:
+    if self.client.connected:
       self.client.update('rooms', {'_id': self.id},
         {'$unset': {'currentMediaPackage': ''}, '$set': {'recording': False}}
       )
@@ -165,13 +164,13 @@ class DDP(Thread):
           data = 0
       data = int(((data + self.vu_range) / float(self.vu_range)) * 100)
       update = {'vumeter': data}
-      if self.connected:
+      if self.client.connected:
         self.client.update('rooms', {'_id': self.id}, {'$set': update})
     self.do_vu = (self.do_vu + 1) % 4
 
   def on_rec_status_update(self, element, data):
     is_paused = data == 'Paused'
-    if self.paused != is_paused and self.connected:
+    if self.paused != is_paused and self.client.connected:
       self.client.update('rooms', {'_id': self.id}, {'$set': {'paused': is_paused}})
       self.paused = is_paused
 
@@ -202,7 +201,7 @@ class DDP(Thread):
 
   def on_subscribed(self, subscription):
     me = self.client.find_one('rooms')
-    if me and self.connected:
+    if me and self.client.connected:
       self.client.update('rooms', {'_id': self.id},
                          {'$set': {'displayName': self.displayName,
                                    'ip': self.ip,
@@ -213,7 +212,7 @@ class DDP(Thread):
                                    }
                          },
                          callback=self.update_callback)
-    elif self.connected:
+    elif self.client.connected:
       audio = self.read_audio_settings()
       self.client.insert('rooms', {'_id': self.id,
                                    'displayName': self.displayName,
@@ -259,7 +258,6 @@ class DDP(Thread):
 
   def on_connected(self):
     logger.info('Connected to Meteor')
-    self.connected = True
     self.client.login(self._user, self._password)
 
     self.update_screenshots()
@@ -273,7 +271,6 @@ class DDP(Thread):
 
   def on_closed(self, code, reason):
     logger.error('Disconnected from Meteor: err %d - %s' % (code, reason))
-    self.connected = False
 
   def update_audio(self):
     me = self.client.find_one('rooms')
@@ -281,7 +278,7 @@ class DDP(Thread):
     if me:
       if ((int(me['audio']['capture']['value']['left']) != int(audio['capture']['value']['left'])) or
             (int(me['audio']['rearMicBoost']['value']['left']) != int(audio['rearMicBoost']['value']['left']))):
-        if self.connected:
+        if self.client.connected:
           self.client.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
     else:
       self.client.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
