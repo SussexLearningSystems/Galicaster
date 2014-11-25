@@ -94,8 +94,11 @@ class DDP(Thread):
     dispatcher.connect('update-rec-status', self.on_rec_status_update)
 
   def run(self):
-    self.client.connect()
-    self.client.subscribe('GalicasterControl', params=[self.id], callback=self.subscription_callback)
+    try:
+      self.client.connect()
+      self.client.subscribe('GalicasterControl', params=[self.id], callback=self.subscription_callback)
+    except Exception:
+      logger.warn('DDP connection failed')
 
   def heartbeat(self, element):
     if self.connected:
