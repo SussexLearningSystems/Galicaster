@@ -123,7 +123,7 @@ class DDP(Thread):
       try:
         if(os.path.getctime(image['file']) > time.time() - 3):
           files[image['type']] = (image['filename'], open(image['file'], 'rb'), 'image/jpeg')
-      except IOError:
+      except Exception:
         pass
     im = ImageGrab.grab(bbox=(10, 10, 1280, 720), backend='imagemagick')
     im.thumbnail((640, 360))
