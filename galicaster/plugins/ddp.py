@@ -105,21 +105,13 @@ class DDP(Thread):
   def on_start_recording(self, sender, id):
     media_package = self.media_package_metadata(id)
     self.client.update('rooms', {'_id': self.id},
-      {'$set': {'currentMediaPackage': media_package}}
+      {'$set': {'currentMediaPackage': media_package, 'recording': True}}
     )
 
   def on_stop_recording(self, sender=None):
     self.client.update('rooms', {'_id': self.id},
-      {'$set': {'currentMediaPackage': None}}
+      {'$unset': {'currentMediaPackage': ''}, '$set': {'recording': False}}
     )
-
-  def is_recording(self):
-    me = self.client.find_one('rooms')
-    is_recording = context.get_state().is_recording
-    result = {}
-    if me and (not 'recording' in me or is_recording != me['recording']):
-      result = {'recording': is_recording}
-    return result
 
   def update_screenshots(self):
     images = [
@@ -165,7 +157,6 @@ class DDP(Thread):
           data = 0
       data = int(((data + self.vu_range) / float(self.vu_range)) * 100)
       update = {'vumeter': data}
-      update.update(self.is_recording())
       if self.connected:
         self.client.update('rooms', {'_id': self.id}, {'$set': update})
     self.do_vu = (self.do_vu + 1) % 4
