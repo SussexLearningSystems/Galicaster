@@ -152,6 +152,7 @@ class RecorderClassUI(gtk.Box):
         self.dispatcher.connect("galicaster-status", self.event_change_mode)
         self.dispatcher.connect("galicaster-notify-quit", self.close)
         self.dispatcher.connect("recorder-error", self.handle_pipeline_error)
+        self.dispatcher.connect("toggle-pause-rec", self.on_pause)
 
         nb=builder.get_object("data_panel")
         pages = nb.get_n_pages()        
@@ -179,6 +180,8 @@ class RecorderClassUI(gtk.Box):
         self.net_activity = self.conf.get_boolean('ingest', 'active')
 
         self.change_state(GC_READY)
+
+        self.pause_dialog = None
 
         self.proportion = 1
         self.on_start()
@@ -351,49 +354,18 @@ class RecorderClassUI(gtk.Box):
     def on_pause(self,button):
         """Pauses or resumes a recording"""
         if self.status == GC_PAUSED:
-            self.dispatcher.emit("enable-no-audio")
             logger.debug("Resuming Recording")
-            self.change_state(GC_RECORDING)
-            self.recorder.resume()
+            self.pause_dialog.do_unpause()
         elif self.status == GC_RECORDING:
             self.dispatcher.emit("disable-no-audio")
             logger.debug("Pausing Recording")
             self.change_state(GC_PAUSED)
             self.recorder.pause()
-            gui = gtk.Builder()
-            gui.add_from_file(get_ui_path("paused.glade"))
-            self.pause_dialog = self.create_pause_dialog(self.get_toplevel())
-    
-            response = self.pause_dialog.run()
-            if response == 1:
-                self.on_pause(None)
-            self.pause_dialog.destroy()     
 
+            if not self.pause_dialog:
+                self.pause_dialog = Pause(self)
+            self.pause_dialog.show()
 
-    def create_pause_dialog(self, parent):
-       
-        gui = gtk.Builder()
-        gui.add_from_file(get_ui_path("paused.glade"))
-        dialog = gui.get_object("dialog") 
-        dialog.set_transient_for(parent)
-        dialog.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_TOOLBAR)
-        dialog.set_modal(True)
-        dialog.set_keep_above(False)
-        dialog.set_skip_taskbar_hint(True)
-        size = context.get_mainwindow().get_size()
-        k2 = size[1] / 1080.0
-        size= int(k2*150)
-        dialog.set_default_size(size,size)
-        button = gui.get_object("image")
-        pixbuf = gtk.gdk.pixbuf_new_from_file(get_image_path('gc-pause.svg'))
-        pixbuf = pixbuf.scale_simple(
-            size,
-            size,
-            gtk.gdk.INTERP_BILINEAR)
-        button.set_from_pixbuf(pixbuf)
-        return dialog
-
-            
     def on_ask_stop(self,button):
         """Stops preview or recording and closes the Mediapakage"""
         self.dispatcher.emit("disable-no-audio")
@@ -429,6 +401,10 @@ class RecorderClassUI(gtk.Box):
             self.error_dialog.dialog_destroy()
             self.error_dialog = None
             self.error_text = None
+
+        if self.pause_dialog:
+            self.pause_dialog.hide()
+
         self.recorder.stop_record_and_restart_preview()
         self.change_state(GC_STOP)
 
@@ -1104,7 +1080,7 @@ class RecorderClassUI(gtk.Box):
         elif state == GC_PREVIEW:    
             record.set_sensitive( (self.allow_start or self.allow_manual) )
             pause.set_sensitive(False)
-            pause.set_active(False)
+            pause.set_sensitive(False)
             stop.set_sensitive(False)
             helpb.set_sensitive(True)
             prevb.set_sensitive(True)
@@ -1136,8 +1112,6 @@ class RecorderClassUI(gtk.Box):
             self.dispatcher.emit("update-rec-status", "Paused")
             
         elif state == GC_STOP:
-            if self.previous == GC_PAUSED:
-                self.pause_dialog.destroy()
             record.set_sensitive(False)
             pause.set_sensitive(False)
             stop.set_sensitive(False)
@@ -1195,6 +1169,44 @@ class RecorderClassUI(gtk.Box):
         if self.status in [GC_PREVIEW]:
             self.recorder.stop_preview()        
         return True        
+
+class Pause(gtk.Window):
+
+    __gtype_name__ = 'Pause'
+
+    def __init__(self, recorder_ui):
+        gtk.Window.__init__(self)
+        parent = context.get_mainwindow()
+
+        self.recorder_ui = recorder_ui
+
+        width, height = parent.get_size()
+
+        self.set_property("width-request", width / 4)
+        self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_TOOLBAR)
+        self.set_keep_above(True)
+        self.set_position(gtk.WIN_POS_CENTER_ALWAYS)
+        self.set_modal(True)
+
+        pause = gtk.Button()
+        pause_image = gtk.Image()
+        pixbuf = gtk.gdk.pixbuf_new_from_file(get_image_path('gc-pause.svg'))
+        pixbuf = pixbuf.scale_simple(
+            width / 4,
+            width / 4,
+            gtk.gdk.INTERP_BILINEAR)
+        pause_image.set_from_pixbuf(pixbuf)
+        pause.connect('clicked', self.do_unpause)
+        pause.add(pause_image)
+
+        self.add(pause)
+        self.show_all()
+
+    def do_unpause(self, widget=None):
+        logger.debug("Resuming Recording")
+        self.recorder_ui.recorder.resume()
+        self.recorder_ui.change_state(GC_RECORDING)
+        self.hide()
 
 
 gobject.type_register(RecorderClassUI)

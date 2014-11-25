@@ -76,11 +76,22 @@ class DDP(Thread):
     self._user = conf.get('ddp', 'user')
     self._password = conf.get('ddp', 'password')
     self._http_host = conf.get('ddp', 'http_host')
+    self.paused = False
+    self.recording = False
+
+    cam_available = conf.get('sussexlogin', 'cam_available') or cam_available
+    if cam_available in ('True', 'true', True, '1', 1):
+      self.cam_available = 1
+    elif cam_available in ('False', 'false', False, '0', 0):
+      self.cam_available = 0
+    else:
+      self.cam_available = int(cam_available)
 
     dispatcher.connect('update-rec-vumeter', self.vumeter)
     dispatcher.connect('galicaster-notify-timer-short', self.heartbeat)
     dispatcher.connect('start-before', self.on_start_recording)
     dispatcher.connect('restart-preview', self.on_stop_recording)
+    dispatcher.connect('update-rec-status', self.on_rec_status_update)
 
   def run(self):
     self.client.connect()
@@ -157,8 +168,13 @@ class DDP(Thread):
       update.update(self.is_recording())
       if self.connected:
         self.client.update('rooms', {'_id': self.id}, {'$set': update})
-
     self.do_vu = (self.do_vu + 1) % 4
+
+  def on_rec_status_update(self, element, data):
+    is_paused = data == 'Paused'
+    if self.paused != is_paused and self.connected:
+      self.client.update('rooms', {'_id': self.id}, {'$set': {'paused': is_paused}})
+      self.paused = is_paused
 
   def media_package_metadata(self, id):
     mp = context.get_repository().get(id)
@@ -188,11 +204,27 @@ class DDP(Thread):
   def on_subscribed(self, subscription):
     me = self.client.find_one('rooms')
     if me and self.connected:
-      self.client.update('rooms', {'_id': self.id}, {'$set': {'displayName': self.displayName, 'ip': self.ip}},
+      self.client.update('rooms', {'_id': self.id},
+                         {'$set': {'displayName': self.displayName,
+                                   'ip': self.ip,
+                                   'paused': False,
+                                   'recording': False,
+                                   'heartbeat': int(time.time()),
+                                   'camAvailable': self.cam_available
+                                   }
+                         },
                          callback=self.update_callback)
     elif self.connected:
       audio = self.read_audio_settings()
-      self.client.insert('rooms', {'_id': self.id, 'displayName': self.displayName, 'audio': audio, 'ip': self.ip})
+      self.client.insert('rooms', {'_id': self.id,
+                                   'displayName': self.displayName,
+                                   'audio': audio,
+                                   'ip': self.ip,
+                                   'paused': False,
+                                   'recording': False,
+                                   'heartbeat': int(time.time()),
+                                   'camAvailable': self.cam_available
+                                  })
 
   def on_changed(self, collection, id, fields, cleared):
     me = self.client.find_one('rooms')
@@ -203,6 +235,28 @@ class DDP(Thread):
       (float(me['audio']['rearMicBoost']['value']['left']) / float(me['audio']['rearMicBoost']['limits']['max'])) * 100)
     self.boost_mixer.setvolume(level, 0, 'capture')
     self.boost_mixer.setvolume(level, 1, 'capture')
+    if self.recording and self.paused != me['paused']:
+      self.set_paused(me['paused'])
+    if self.recording != me['recording']:
+      self.set_recording(me)
+
+  def set_paused(self, new_status):
+    self.paused = new_status
+    dispatcher.emit("toggle-pause-rec")
+
+  def set_recording(self, me):
+    self.recording = me['recording']
+    if self.recording:
+      meta = me.get('currentMediaPackage', {}) or {}
+      profile = me.get('currentProfile', 'nocam')
+      series = (meta.get('series_title', ''), meta.get('isPartOf', ''))
+      user = {'user_name': meta.get('creator', ''),
+              'user_id': meta.get('rightsHolder', '')}
+      title = meta.get('title', 'Unknown')
+      dispatcher.emit('sussexlogin-record',
+                      (user, title, series, profile))
+    else:
+      dispatcher.emit("stop-record", '')
 
   def on_connected(self):
     logger.info('Connected to Meteor')
