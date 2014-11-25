@@ -112,7 +112,7 @@ class DDP(Thread):
 
   def update_screenshots(self):
     images = [
-      { 'type': 'presentation', 'filename': 'screen.jpg', 'file': '/tmp/SCREEN.avi.jpg' },
+      { 'type': 'presentation', 'filename': 'presentation.jpg', 'file': '/tmp/SCREEN.avi.jpg' },
       { 'type': 'presenter', 'filename': 'camera.jpg', 'file': '/tmp/CAMERA.avi.jpg' }
     ]
     files = {}
