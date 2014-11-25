@@ -107,14 +107,16 @@ class DDP(Thread):
 
   def on_start_recording(self, sender, id):
     media_package = self.media_package_metadata(id)
-    self.client.update('rooms', {'_id': self.id},
-      {'$set': {'currentMediaPackage': media_package, 'recording': True}}
-    )
+    if self.connected:
+      self.client.update('rooms', {'_id': self.id},
+        {'$set': {'currentMediaPackage': media_package, 'recording': True}}
+      )
 
   def on_stop_recording(self, sender=None):
-    self.client.update('rooms', {'_id': self.id},
-      {'$unset': {'currentMediaPackage': ''}, '$set': {'recording': False}}
-    )
+    if self.connected:
+      self.client.update('rooms', {'_id': self.id},
+        {'$unset': {'currentMediaPackage': ''}, '$set': {'recording': False}}
+      )
 
   def update_screenshots(self):
     images = [
