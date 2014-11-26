@@ -45,7 +45,7 @@ class PopUp(gtk.Widget):
     __gtype_name__ = 'PopUp'
 
     def __init__(self, message = None, text = dict(), parent=None,
-                 buttons = None, two_lines = None): 
+                 buttons = None, two_lines = None, run=True):
         """
         message: type of message (INFO,QUESTION,WARNING, ERROR, ACTION)
         text: dictionary with three fields (title, main question, explanation text)
@@ -84,7 +84,7 @@ class PopUp(gtk.Widget):
             a = self.dialog.get_action_area().get_children()[0]
             a.connect('clicked',self.dialog_destroy)            
             self.dialog.show_all()
-        else:
+        elif run:
             self.response = dialog.run()
             dialog.destroy()
 
