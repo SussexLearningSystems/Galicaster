@@ -182,6 +182,7 @@ class RecorderClassUI(gtk.Box):
         self.change_state(GC_READY)
 
         self.pause_dialog = None
+        self.stop_dialog = None
 
         self.proportion = 1
         self.on_start()
@@ -353,6 +354,9 @@ class RecorderClassUI(gtk.Box):
 
     def on_pause(self,button):
         """Pauses or resumes a recording"""
+        if self.stop_dialog:
+            self.stop_dialog.destroy()
+
         if self.status == GC_PAUSED:
             logger.debug("Resuming Recording")
             self.pause_dialog.do_unpause()
@@ -374,14 +378,17 @@ class RecorderClassUI(gtk.Box):
                     "main" : _("Are you sure you want to\nstop the recording?"),
             }
             buttons = ( gtk.STOCK_STOP, gtk.RESPONSE_OK, gtk.STOCK_CANCEL, gtk.RESPONSE_REJECT)
-            warning = message.PopUp(message.WARNING, text,
-              context.get_mainwindow(), buttons
-            )
-            self.dispatcher.emit("enable-no-audio")
-            if warning.response not in message.POSITIVE or self.status not in [GC_RECORDING]:
-                return False
-            else:
-                self.on_stop("UI","current")
+            self.stop_dialog = message.PopUp(message.WARNING, text,
+              context.get_mainwindow(), buttons, run=False
+            ).dialog
+            self.stop_dialog.connect('response', self._on_ask_stop_response)
+            self.stop_dialog.show()
+
+    def _on_ask_stop_response(self,dialog, res):
+        dialog.destroy()
+        self.dispatcher.emit("enable-no-audio")
+        if res in message.POSITIVE or self.status not in [GC_RECORDING]:
+            self.on_stop("UI","current")
 
     def on_stop(self,source,identifier): 
         """Close recording and clean schedule if neccesary"""
@@ -404,6 +411,8 @@ class RecorderClassUI(gtk.Box):
 
         if self.pause_dialog:
             self.pause_dialog.hide()
+        if self.stop_dialog:
+            self.stop_dialog.destroy()
 
         self.recorder.stop_record_and_restart_preview()
         self.change_state(GC_STOP)
