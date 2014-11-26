@@ -93,6 +93,9 @@ class DDP(Thread):
     dispatcher.connect('update-rec-status', self.on_rec_status_update)
 
   def run(self):
+    self.connect()
+
+  def connect(self):
     try:
       self.client.connect()
       self.client.subscribe('GalicasterControl', params=[self.id], callback=self.subscription_callback)
@@ -103,6 +106,8 @@ class DDP(Thread):
     if self.client.connected:
       self.update_screenshots()
       self.client.update('rooms', {'_id': self.id}, {'$set': {'heartbeat': int(time.time())}})
+    else:
+      self.connect()
 
   def on_start_recording(self, sender, id):
     media_package = self.media_package_metadata(id)
