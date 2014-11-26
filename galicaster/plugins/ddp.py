@@ -51,6 +51,7 @@ class DDP(Thread):
     self._http_host = conf.get('ddp', 'http_host')
     self.paused = False
     self.recording = False
+    self.has_disconnected = False
 
     cam_available = conf.get('sussexlogin', 'cam_available') or cam_available
     if cam_available in ('True', 'true', True, '1', 1):
@@ -70,35 +71,35 @@ class DDP(Thread):
     self.connect()
 
   def connect(self):
-    try:
-      self.client.connect()
-      self.client.subscribe('GalicasterControl', params=[self.id], callback=self.subscription_callback)
-    except Exception:
-      logger.warn('DDP connection failed')
+    if not self.has_disconnected:
+        try:
+          self.client.connect()
+          self.client.subscribe('GalicasterControl', params=[self.id], callback=self.subscription_callback)
+        except Exception:
+          logger.warn('DDP connection failed')
 
   def update(self, collection, query, update):
     if self.client.connected:
       try:
         self.client.update(collection, query, update, callback=self.update_callback)
       except Exception:
-        print('Error updating document')
-    else:
-      self.connect()
+        logger.warn("Error updating document {collection: %s, query: %s, update: %s}" % (collection, query, update))
 
   def insert(self, collection, document):
     if self.client.connected:
       try:
         self.client.insert(collection, document, callback=self.insert_callback)
       except Exception:
-        print('Error inserting document')
-    else:
-      self.connect()
+        logger.warn("Error inserting document {collection: %s, document: %s}" % (collection, document))
 
   def heartbeat(self, element):
-    self.update_screenshots()
-    self.update('rooms', {'_id': self.id},
-      {'$set': {'heartbeat': int(time.time())}}
-    )
+    if self.client.connected:
+        self.update_screenshots()
+        self.update('rooms', {'_id': self.id},
+          {'$set': {'heartbeat': int(time.time())}}
+        )
+    else:
+      self.connect()
 
   def on_start_recording(self, sender, id):
     media_package = self.media_package_metadata(id)
@@ -192,19 +193,15 @@ class DDP(Thread):
 
   def subscription_callback(self, error):
     if error:
-      print '*** ERROR: ', error
+        logger.warn("Subscription callback returned error: %s" % error)
 
   def insert_callback(self, error, data):
     if error:
-      print '*** ERROR: ', error
-      return
-    print '*** DATA: ', data
+        logger.warn("Insert callback returned error: %s" % error)
 
   def update_callback(self, error, data):
     if error:
-      print '*** ERROR: ', error
-      return
-    print '*** DATA: ', data
+        logger.warn("Update callback returned error: %s" % error)
 
   def on_subscribed(self, subscription):
     me = self.client.find_one('rooms')
@@ -277,6 +274,7 @@ class DDP(Thread):
       self.boost_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
 
   def on_closed(self, code, reason):
+    self.has_disconnected = True
     logger.error('Disconnected from Meteor: err %d - %s' % (code, reason))
 
   def update_audio(self):
