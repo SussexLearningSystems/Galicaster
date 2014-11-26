@@ -24,32 +24,6 @@ def init():
   ddp = DDP()
   ddp.start()
 
-
-def dict_diff(dict_a, dict_b):
-  return dict([
-    (key, dict_b.get(key, dict_a.get(key)))
-    for key in set(dict_a.keys() + dict_b.keys())
-    if (
-      (key in dict_a and (not key in dict_b or dict_a[key] != dict_b[key])) or
-      (key in dict_b and (not key in dict_a or dict_a[key] != dict_b[key]))
-    )
-  ])
-
-
-def call_repeatedly(interval, func, *args):
-  stopped = Event()
-
-  def loop():
-    exec_time = 0
-    while not stopped.wait(interval - exec_time):
-      start = time.time()
-      func(*args)
-      exec_time = time.time() - start
-
-  Thread(target=loop).start()
-  return stopped.set
-
-
 class DDP(Thread):
   def __init__(self):
     Thread.__init__(self)
