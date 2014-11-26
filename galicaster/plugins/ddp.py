@@ -1,10 +1,10 @@
 import calendar
 import alsaaudio
-import base64
 import cStringIO
 import os
 import requests
 import socket
+import subprocess
 from threading import Event, Thread
 import time
 
@@ -166,6 +166,8 @@ class DDP(Thread):
     if self.paused != is_paused and self.connected:
       self.client.update('rooms', {'_id': self.id}, {'$set': {'paused': is_paused}})
       self.paused = is_paused
+    if data == '  Recording  ':
+      subprocess.call(['killall', 'maliit-server'])
 
   def media_package_metadata(self, id):
     mp = context.get_repository().get(id)
