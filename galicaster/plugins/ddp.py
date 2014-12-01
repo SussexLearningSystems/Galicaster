@@ -24,32 +24,6 @@ def init():
   ddp = DDP()
   ddp.start()
 
-
-def dict_diff(dict_a, dict_b):
-  return dict([
-    (key, dict_b.get(key, dict_a.get(key)))
-    for key in set(dict_a.keys() + dict_b.keys())
-    if (
-      (key in dict_a and (not key in dict_b or dict_a[key] != dict_b[key])) or
-      (key in dict_b and (not key in dict_a or dict_a[key] != dict_b[key]))
-    )
-  ])
-
-
-def call_repeatedly(interval, func, *args):
-  stopped = Event()
-
-  def loop():
-    exec_time = 0
-    while not stopped.wait(interval - exec_time):
-      start = time.time()
-      func(*args)
-      exec_time = time.time() - start
-
-  Thread(target=loop).start()
-  return stopped.set
-
-
 class DDP(Thread):
   def __init__(self):
     Thread.__init__(self)
@@ -62,7 +36,6 @@ class DDP(Thread):
     self.client.on('reconnected', self.on_connected)
     self.client.on('closed', self.on_closed)
 
-    self.connected = False
     self.displayName = conf.get('sussexlogin', 'room_name')
     self.vu_min = -70
     self.vu_range = 40
@@ -78,6 +51,7 @@ class DDP(Thread):
     self._http_host = conf.get('ddp', 'http_host')
     self.paused = False
     self.recording = False
+    self.has_disconnected = False
 
     cam_available = conf.get('sussexlogin', 'cam_available') or cam_available
     if cam_available in ('True', 'true', True, '1', 1):
@@ -94,29 +68,62 @@ class DDP(Thread):
     dispatcher.connect('update-rec-status', self.on_rec_status_update)
 
   def run(self):
-    self.client.connect()
-    self.client.subscribe('GalicasterControl', params=[self.id], callback=self.subscription_callback)
+    self.connect()
+
+  def connect(self):
+    if not self.has_disconnected:
+        try:
+          self.client.connect()
+          self.client.subscribe('GalicasterControl', params=[self.id], callback=self.subscription_callback)
+        except Exception:
+          logger.warn('DDP connection failed')
+
+  def update(self, collection, query, update):
+    if self.client.connected:
+      try:
+        self.client.update(collection, query, update, callback=self.update_callback)
+      except Exception:
+        logger.warn("Error updating document {collection: %s, query: %s, update: %s}" % (collection, query, update))
+
+  def insert(self, collection, document):
+    if self.client.connected:
+      try:
+        self.client.insert(collection, document, callback=self.insert_callback)
+      except Exception:
+        logger.warn("Error inserting document {collection: %s, document: %s}" % (collection, document))
 
   def heartbeat(self, element):
-    if self.connected:
-      self.update_screenshots()
-      self.client.update('rooms', {'_id': self.id}, {'$set': {'heartbeat': int(time.time())}})
+    if self.client.connected:
+        self.update_screenshots()
+        self.update('rooms', {'_id': self.id},
+          {'$set': {'heartbeat': int(time.time())}}
+        )
+    else:
+      self.connect()
 
   def on_start_recording(self, sender, id):
     media_package = self.media_package_metadata(id)
-    self.client.update('rooms', {'_id': self.id},
-      {'$set': {'currentMediaPackage': media_package, 'recording': True}}
+    self.update('rooms', {'_id': self.id},
+        {'$set': {'currentMediaPackage': media_package, 'recording': True}}
     )
 
   def on_stop_recording(self, sender=None):
-    self.client.update('rooms', {'_id': self.id},
+    self.update('rooms', {'_id': self.id},
       {'$unset': {'currentMediaPackage': ''}, '$set': {'recording': False}}
     )
 
   def update_screenshots(self):
     images = [
-      { 'type': 'presentation', 'filename': 'presentation.jpg', 'file': '/tmp/SCREEN.avi.jpg' },
-      { 'type': 'presenter', 'filename': 'camera.jpg', 'file': '/tmp/CAMERA.avi.jpg' }
+      {
+        'type': 'presentation',
+        'filename': 'presentation.jpg',
+        'file': '/tmp/SCREEN.avi.jpg'
+      },
+      {
+        'type': 'presenter',
+        'filename': 'camera.jpg',
+        'file': '/tmp/CAMERA.avi.jpg'
+      }
     ]
     files = {}
     for image in images:
@@ -132,7 +139,10 @@ class DDP(Thread):
       im = im.convert("RGB")
     im.save(output, format="JPEG")
     files['screen'] = ('screen.jpg', output.getvalue(), 'image/jpeg')
-    requests.post("%s/image/%s" % (self._http_host, self.id), files=files)
+    try:
+      requests.post("%s/image/%s" % (self._http_host, self.id), files=files)
+    except Exception:
+      logger.warn('Unable to post images')
 
   def mixer_changed(self, source=None, condition=None, reopen=True):
     if reopen:
@@ -157,14 +167,13 @@ class DDP(Thread):
           data = 0
       data = int(((data + self.vu_range) / float(self.vu_range)) * 100)
       update = {'vumeter': data}
-      if self.connected:
-        self.client.update('rooms', {'_id': self.id}, {'$set': update})
+      self.update('rooms', {'_id': self.id}, {'$set': update})
     self.do_vu = (self.do_vu + 1) % 4
 
   def on_rec_status_update(self, element, data):
     is_paused = data == 'Paused'
-    if self.paused != is_paused and self.connected:
-      self.client.update('rooms', {'_id': self.id}, {'$set': {'paused': is_paused}})
+    if self.paused != is_paused:
+      self.update('rooms', {'_id': self.id}, {'$set': {'paused': is_paused}})
       self.paused = is_paused
     if data == '  Recording  ':
       subprocess.call(['killall', 'maliit-server'])
@@ -186,38 +195,42 @@ class DDP(Thread):
 
   def subscription_callback(self, error):
     if error:
-      print '*** ERROR: ', error
+        logger.warn("Subscription callback returned error: %s" % error)
+
+  def insert_callback(self, error, data):
+    if error:
+        logger.warn("Insert callback returned error: %s" % error)
 
   def update_callback(self, error, data):
     if error:
-      print '*** ERROR: ', error
-      return
-    print '*** DATA: ', data
+        logger.warn("Update callback returned error: %s" % error)
 
   def on_subscribed(self, subscription):
     me = self.client.find_one('rooms')
-    if me and self.connected:
-      self.client.update('rooms', {'_id': self.id},
-                         {'$set': {'displayName': self.displayName,
-                                   'ip': self.ip,
-                                   'paused': False,
-                                   'recording': False,
-                                   'heartbeat': int(time.time()),
-                                   'camAvailable': self.cam_available
-                                   }
-                         },
-                         callback=self.update_callback)
-    elif self.connected:
+    if me:
+      self.update('rooms', {'_id': self.id}, {
+        '$set': {
+          'displayName': self.displayName,
+          'ip': self.ip,
+          'paused': False,
+          'recording': False,
+          'heartbeat': int(time.time()),
+          'camAvailable': self.cam_available
+        }
+      })
+    else:
       audio = self.read_audio_settings()
-      self.client.insert('rooms', {'_id': self.id,
-                                   'displayName': self.displayName,
-                                   'audio': audio,
-                                   'ip': self.ip,
-                                   'paused': False,
-                                   'recording': False,
-                                   'heartbeat': int(time.time()),
-                                   'camAvailable': self.cam_available
-                                  })
+      self.insert('rooms', {
+        '_id': self.id,
+        'displayName': self.displayName,
+        'audio': audio,
+        'ip': self.ip,
+        'paused': False,
+        'recording': False,
+        'heartbeat': int(time.time()),
+        'camAvailable': self.cam_available
+      })
+    self.update_screenshots()
 
   def on_changed(self, collection, id, fields, cleared):
     me = self.client.find_one('rooms')
@@ -253,10 +266,7 @@ class DDP(Thread):
 
   def on_connected(self):
     logger.info('Connected to Meteor')
-    self.connected = True
     self.client.login(self._user, self._password)
-
-    self.update_screenshots()
 
     if not self.capture_watchid:
       fd, eventmask = self.capture_mixer.polldescriptors()[0]
@@ -266,8 +276,8 @@ class DDP(Thread):
       self.boost_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
 
   def on_closed(self, code, reason):
+    self.has_disconnected = True
     logger.error('Disconnected from Meteor: err %d - %s' % (code, reason))
-    self.connected = False
 
   def update_audio(self):
     me = self.client.find_one('rooms')
@@ -275,15 +285,13 @@ class DDP(Thread):
     if me:
       if ((int(me['audio']['capture']['value']['left']) != int(audio['capture']['value']['left'])) or
             (int(me['audio']['rearMicBoost']['value']['left']) != int(audio['rearMicBoost']['value']['left']))):
-        if self.connected:
-          self.client.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
-    else:
-      self.client.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
+        self.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
 
   def read_audio_settings(self):
-    audio_settings = {}
-    audio_settings['capture'] = self.control_values(self.capture_mixer)
-    audio_settings['rearMicBoost'] = self.control_values(self.boost_mixer)
+    audio_settings = {
+      'capture': self.control_values(self.capture_mixer),
+      'rearMicBoost': self.control_values(self.boost_mixer)
+    }
     self.capture_mixer.setrec(1)
     return audio_settings
 
@@ -292,7 +300,8 @@ class DDP(Thread):
     minimum, maximum = mixer.getrange('capture')
     controls['limits'] = {'min': minimum, 'max': maximum}
     left, right = mixer.getvolume('capture')
-    controls['value'] = {'left': int(round((float(left) / 100) * maximum)),
-                         'right': int(round((float(right) / 100) * maximum))}
+    controls['value'] = {
+      'left': int(round((float(left) / 100) * maximum)),
+      'right': int(round((float(right) / 100) * maximum))
+    }
     return controls
-  
