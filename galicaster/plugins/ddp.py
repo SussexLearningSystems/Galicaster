@@ -111,6 +111,7 @@ class DDP(Thread):
     self.update('rooms', {'_id': self.id},
       {'$unset': {'currentMediaPackage': ''}, '$set': {'recording': False}}
     )
+    self.update_screenshots()
 
   def update_screenshots(self):
     images = [
@@ -175,8 +176,10 @@ class DDP(Thread):
     if self.paused != is_paused:
       self.update('rooms', {'_id': self.id}, {'$set': {'paused': is_paused}})
       self.paused = is_paused
+      self.update_screenshots()
     if data == '  Recording  ':
       subprocess.call(['killall', 'maliit-server'])
+      self.update_screenshots()
 
   def media_package_metadata(self, id):
     mp = context.get_repository().get(id)
