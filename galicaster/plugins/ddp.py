@@ -103,8 +103,9 @@ class DDP(Thread):
 
   def on_start_recording(self, sender, id):
     media_package = self.media_package_metadata(id)
+    profile = context.get_state().profile.name
     self.update('rooms', {'_id': self.id},
-        {'$set': {'currentMediaPackage': media_package, 'recording': True}}
+        {'$set': {'currentMediaPackage': media_package, 'recording': True, 'currentProfile': profile}}
     )
 
   def on_stop_recording(self, sender=None):
