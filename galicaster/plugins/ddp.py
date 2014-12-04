@@ -61,6 +61,7 @@ class DDP(Thread):
     else:
       self.cam_available = int(cam_available)
 
+    dispatcher.connect('galicaster-init', self.on_init)
     dispatcher.connect('update-rec-vumeter', self.vumeter)
     dispatcher.connect('galicaster-notify-timer-short', self.heartbeat)
     dispatcher.connect('start-before', self.on_start_recording)
@@ -111,14 +112,17 @@ class DDP(Thread):
     self.update('rooms', {'_id': self.id},
       {'$unset': {'currentMediaPackage': ''}, '$set': {'recording': False}}
     )
-    self.update_screenshots()
+    self.update_screenshots(1.5)
 
-  def update_screenshots(self):
-    worker = Thread(target=self._update_screenshots)
+  def on_init(self, data):
+    self.update_screenshots(1.5)
+
+  def update_screenshots(self, delay=0):
+    worker = Thread(target=self._update_screenshots, args=(delay,))
     worker.start()
 
-  def _update_screenshots(self):
-    time.sleep(0.75)
+  def _update_screenshots(self, delay):
+    time.sleep(delay)
     images = [
       {
         'type': 'presentation',
@@ -178,13 +182,14 @@ class DDP(Thread):
 
   def on_rec_status_update(self, element, data):
     is_paused = data == 'Paused'
+    if is_paused:
+      self.update_screenshots(.75)
     if self.paused != is_paused:
       self.update('rooms', {'_id': self.id}, {'$set': {'paused': is_paused}})
       self.paused = is_paused
-      self.update_screenshots()
     if data == '  Recording  ':
       subprocess.call(['killall', 'maliit-server'])
-      self.update_screenshots()
+      self.update_screenshots(.75)
 
   def media_package_metadata(self, id):
     mp = context.get_repository().get(id)
@@ -238,7 +243,6 @@ class DDP(Thread):
         'heartbeat': int(time.time()),
         'camAvailable': self.cam_available
       })
-    self.update_screenshots()
 
   def on_changed(self, collection, id, fields, cleared):
     me = self.client.find_one('rooms')
