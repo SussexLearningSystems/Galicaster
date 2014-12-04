@@ -114,6 +114,11 @@ class DDP(Thread):
     self.update_screenshots()
 
   def update_screenshots(self):
+    worker = Thread(target=self._update_screenshots)
+    worker.start()
+
+  def _update_screenshots(self):
+    time.sleep(0.75)
     images = [
       {
         'type': 'presentation',
