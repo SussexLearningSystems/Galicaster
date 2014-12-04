@@ -242,9 +242,9 @@ class DDP(Thread):
       (float(me['audio']['rearMicBoost']['value']['left']) / float(me['audio']['rearMicBoost']['limits']['max'])) * 100)
     self.boost_mixer.setvolume(level, 0, 'capture')
     self.boost_mixer.setvolume(level, 1, 'capture')
-    if self.recording and self.paused != me['paused']:
+    if self.paused != me['paused']:
       self.set_paused(me['paused'])
-    if self.recording != me['recording']:
+    if context.get_state().is_recording != me['recording']:
       self.set_recording(me)
 
   def set_paused(self, new_status):
