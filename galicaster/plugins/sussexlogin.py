@@ -421,40 +421,40 @@ def start_recording(orig, metadata):
     then emitting a 'start-before' signal.
     """
     global trigger_recording, waiting_for_details, ed
-    if not switching_profile:
-        waiting_for_details = False
 
-        user, title, module, profile = metadata
+    waiting_for_details = False
 
-        if sussex_login_dialog:
-          sussex_login_dialog.hide()
+    user, title, module, profile = metadata
 
-        if ed:
-          ed.hide()
+    if sussex_login_dialog:
+      sussex_login_dialog.hide()
 
-        switch_profile(profile)
-        repo = context.get_repository()
-        if user:
-            pres = user['user_name']
-            user_id = user['user_id']
-        else:
-            pres = ''
-            user_id = ''
-        mp = Mediapackage(title=title, presenter=pres)
-        mp.setMetadataByName('rightsHolder', user_id)
-        if module:
-            series = {'title': module[0], 'identifier': module[1]}
-            pub = conf.get('sussexlogin', 'publisher')
-            series['publisher'] = pub
-            mp.setSeries(series)
-        room = conf.get('sussexlogin', 'room_name')
-        mp.setMetadataByName('spatial', room)
-        repo.add(mp)
+    if ed:
+      ed.hide()
 
-        if switching_profile:
-            trigger_recording = mp.getIdentifier()
-        else:
-            dispatcher.emit('start-before', mp.getIdentifier())
+    switch_profile(profile)
+    repo = context.get_repository()
+    if user:
+        pres = user['user_name']
+        user_id = user['user_id']
+    else:
+        pres = ''
+        user_id = ''
+    mp = Mediapackage(title=title, presenter=pres)
+    mp.setMetadataByName('rightsHolder', user_id)
+    if module:
+        series = {'title': module[0], 'identifier': module[1]}
+        pub = conf.get('sussexlogin', 'publisher')
+        series['publisher'] = pub
+        mp.setSeries(series)
+    room = conf.get('sussexlogin', 'room_name')
+    mp.setMetadataByName('spatial', room)
+    repo.add(mp)
+
+    if switching_profile:
+        trigger_recording = mp.getIdentifier()
+    else:
+        dispatcher.emit('start-before', mp.getIdentifier())
 
 def switch_profile(profile):
     global switching_profile
