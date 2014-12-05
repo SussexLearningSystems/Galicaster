@@ -253,11 +253,6 @@ class DDP(Thread):
     if l != level:
       self.capture_mixer.setvolume(level, 0, 'capture')
       self.capture_mixer.setvolume(level, 1, 'capture')
-    level = me['audio']['rearMicBoost']['value']['left']
-    l, r = self.boost_mixer.getvolume('capture')
-    if l != level:
-      self.boost_mixer.setvolume(level, 0, 'capture')
-      self.boost_mixer.setvolume(level, 1, 'capture')
     level = me['audio']['headphone']['value']['left']
     l, r = self.headphone_mixer.getvolume('playback')
     if l != level:
@@ -321,6 +316,8 @@ class DDP(Thread):
     }
     self.capture_mixer.setrec(1)
     self.headphone_mixer.setmute(0)
+    self.boost_mixer.setvolume(0, 0, 'capture')
+    self.boost_mixer.setvolume(0, 1, 'capture')
     return audio_settings
 
   def control_values(self, mixer, direction):
