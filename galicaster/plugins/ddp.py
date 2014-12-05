@@ -44,8 +44,10 @@ class DDP(Thread):
     self.id = conf.get('ingest', 'hostname')
     self.capture_mixer = alsaaudio.Mixer(control='Capture')
     self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
+    self.headphone_mixer = alsaaudio.Mixer(control='Headphone')
     self.capture_watchid = None
     self.boost_watchid = None
+    self.headphone_watchid = None
     self._user = conf.get('ddp', 'user')
     self._password = conf.get('ddp', 'password')
     self._http_host = conf.get('ddp', 'http_host')
@@ -161,6 +163,8 @@ class DDP(Thread):
       self.capture_mixer = alsaaudio.Mixer(control='Capture')
       del self.boost_mixer
       self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
+      del self.headphone_mixer
+      self.headphone_mixer = alsaaudio.Mixer(control='Headphone')
     self.update_audio()
     return True
 
@@ -254,6 +258,9 @@ class DDP(Thread):
       (float(me['audio']['rearMicBoost']['value']['left']) / float(me['audio']['rearMicBoost']['limits']['max'])) * 100)
     self.boost_mixer.setvolume(level, 0, 'capture')
     self.boost_mixer.setvolume(level, 1, 'capture')
+    level = int((float(me['audio']['headphone']['value']['left']) / float(me['audio']['headphone']['limits']['max'])) * 100)
+    self.headphone_mixer.setvolume(level, 0, 'playback')
+    self.headphone_mixer.setvolume(level, 1, 'playback')
     if self.paused != me['paused']:
       self.set_paused(me['paused'])
     if context.get_state().is_recording != me['recording']:
@@ -287,6 +294,9 @@ class DDP(Thread):
     if not self.boost_watchid:
       fd, eventmask = self.boost_mixer.polldescriptors()[0]
       self.boost_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
+    if not self.headphone_watchid:
+      fd, eventmask = self.headphone_mixer.polldescriptors()[0]
+      self.headphone_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
 
   def on_closed(self, code, reason):
     self.has_disconnected = True
@@ -297,22 +307,24 @@ class DDP(Thread):
     audio = self.read_audio_settings()
     if me:
       if ((int(me['audio']['capture']['value']['left']) != int(audio['capture']['value']['left'])) or
-            (int(me['audio']['rearMicBoost']['value']['left']) != int(audio['rearMicBoost']['value']['left']))):
+            (int(me['audio']['rearMicBoost']['value']['left']) != int(audio['rearMicBoost']['value']['left'])) or
+            (int(me['audio']['headphone']['value']['left']) != int(audio['headphone']['value']['left']))):
         self.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
 
   def read_audio_settings(self):
     audio_settings = {
-      'capture': self.control_values(self.capture_mixer),
-      'rearMicBoost': self.control_values(self.boost_mixer)
+      'capture': self.control_values(self.capture_mixer, 'capture'),
+      'rearMicBoost': self.control_values(self.boost_mixer, 'capture'),
+      'headphone': self.control_values(self.headphone_mixer, 'playback')
     }
     self.capture_mixer.setrec(1)
     return audio_settings
 
-  def control_values(self, mixer):
+  def control_values(self, mixer, direction):
     controls = {}
-    minimum, maximum = mixer.getrange('capture')
+    minimum, maximum = mixer.getrange(direction)
     controls['limits'] = {'min': minimum, 'max': maximum}
-    left, right = mixer.getvolume('capture')
+    left, right = mixer.getvolume(direction)
     controls['value'] = {
       'left': int(round((float(left) / 100) * maximum)),
       'right': int(round((float(right) / 100) * maximum))
