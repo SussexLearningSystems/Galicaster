@@ -222,6 +222,7 @@ class DDP(Thread):
 
   def on_subscribed(self, subscription):
     me = self.client.find_one('rooms')
+    audio = self.read_audio_settings()
     if me:
       self.update('rooms', {'_id': self.id}, {
         '$set': {
@@ -234,7 +235,6 @@ class DDP(Thread):
         }
       })
     else:
-      audio = self.read_audio_settings()
       self.insert('rooms', {
         '_id': self.id,
         'displayName': self.displayName,
@@ -320,6 +320,7 @@ class DDP(Thread):
       'headphone': self.control_values(self.headphone_mixer, 'playback')
     }
     self.capture_mixer.setrec(1)
+    self.headphone_mixer.setmute(0)
     return audio_settings
 
   def control_values(self, mixer, direction):
