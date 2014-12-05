@@ -228,6 +228,7 @@ class DDP(Thread):
       self.update('rooms', {'_id': self.id}, {
         '$set': {
           'displayName': self.displayName,
+          'audio': audio,
           'ip': self.ip,
           'paused': False,
           'recording': False,
