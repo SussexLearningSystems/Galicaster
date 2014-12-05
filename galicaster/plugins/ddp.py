@@ -248,17 +248,19 @@ class DDP(Thread):
       })
 
   def on_changed(self, collection, id, fields, cleared):
+    audio = fields.get('audio')
+    if audio:
+      level = audio.get('captureLevel')
+      l, r = self.capture_mixer.getvolume('capture')
+      if level and l != level:
+        self.capture_mixer.setvolume(level, 0, 'capture')
+        self.capture_mixer.setvolume(level, 1, 'capture')
+      level = audio.get('headphoneLevel')
+      l, r = self.headphone_mixer.getvolume('playback')
+      if level and l != level:
+        self.headphone_mixer.setvolume(level, 0, 'playback')
+        self.headphone_mixer.setvolume(level, 1, 'playback')
     me = self.client.find_one('rooms')
-    level = me['audio']['capture']['level']
-    l, r = self.capture_mixer.getvolume('capture')
-    if l != level:
-      self.capture_mixer.setvolume(level, 0, 'capture')
-      self.capture_mixer.setvolume(level, 1, 'capture')
-    level = me['audio']['headphone']['level']
-    l, r = self.headphone_mixer.getvolume('playback')
-    if l != level:
-      self.headphone_mixer.setvolume(level, 0, 'playback')
-      self.headphone_mixer.setvolume(level, 1, 'playback')
     if self.paused != me['paused']:
       self.set_paused(me['paused'])
     if context.get_state().is_recording != me['recording']:
@@ -301,14 +303,15 @@ class DDP(Thread):
     me = self.client.find_one('rooms')
     audio = self.read_audio_settings()
     if me:
-      if (me['audio']['capture']['level'] != audio['capture']['level'] or
-          me['audio']['headphone']['level'] != audio['headphone']['level']):
+      mAudio = me.get('audio')
+      if (mAudio.get('captureLevel') != audio.get('captureLevel') or
+          mAudio.get('headphoneLevel') != audio.get('headphoneLevel')):
         self.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
 
   def read_audio_settings(self):
     audio_settings = {
-      'capture': self.control_values(self.capture_mixer, 'capture'),
-      'headphone': self.control_values(self.headphone_mixer, 'playback')
+      'captureLevel': self.control_values(self.capture_mixer, 'capture'),
+      'headphoneLevel': self.control_values(self.headphone_mixer, 'playback')
     }
     self.capture_mixer.setrec(1)
     self.headphone_mixer.setmute(0)
@@ -320,7 +323,4 @@ class DDP(Thread):
 
   def control_values(self, mixer, direction):
     left, right = mixer.getvolume(direction)
-    controls = {
-      'level': left
-    }
-    return controls
+    return left
