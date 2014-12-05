@@ -252,15 +252,21 @@ class DDP(Thread):
   def on_changed(self, collection, id, fields, cleared):
     me = self.client.find_one('rooms')
     level = int((float(me['audio']['capture']['value']['left']) / float(me['audio']['capture']['limits']['max'])) * 100)
-    self.capture_mixer.setvolume(level, 0, 'capture')
-    self.capture_mixer.setvolume(level, 1, 'capture')
+    l, r = self.capture_mixer.getvolume('capture')
+    if l != level:
+        self.capture_mixer.setvolume(level, 0, 'capture')
+        self.capture_mixer.setvolume(level, 1, 'capture')
     level = int(
       (float(me['audio']['rearMicBoost']['value']['left']) / float(me['audio']['rearMicBoost']['limits']['max'])) * 100)
-    self.boost_mixer.setvolume(level, 0, 'capture')
-    self.boost_mixer.setvolume(level, 1, 'capture')
+    l, r = self.boost_mixer.getvolume('capture')
+    if l != level:
+        self.boost_mixer.setvolume(level, 0, 'capture')
+        self.boost_mixer.setvolume(level, 1, 'capture')
     level = int((float(me['audio']['headphone']['value']['left']) / float(me['audio']['headphone']['limits']['max'])) * 100)
-    self.headphone_mixer.setvolume(level, 0, 'playback')
-    self.headphone_mixer.setvolume(level, 1, 'playback')
+    l, r = self.headphone_mixer.getvolume('playback')
+    if l != level:
+        self.headphone_mixer.setvolume(level, 0, 'playback')
+        self.headphone_mixer.setvolume(level, 1, 'playback')
     if self.paused != me['paused']:
       self.set_paused(me['paused'])
     if context.get_state().is_recording != me['recording']:
