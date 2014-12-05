@@ -46,7 +46,6 @@ class DDP(Thread):
     self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
     self.headphone_mixer = alsaaudio.Mixer(control='Headphone')
     self.capture_watchid = None
-    self.boost_watchid = None
     self.headphone_watchid = None
     self._user = conf.get('ddp', 'user')
     self._password = conf.get('ddp', 'password')
@@ -288,9 +287,6 @@ class DDP(Thread):
     if not self.capture_watchid:
       fd, eventmask = self.capture_mixer.polldescriptors()[0]
       self.capture_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
-    if not self.boost_watchid:
-      fd, eventmask = self.boost_mixer.polldescriptors()[0]
-      self.boost_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
     if not self.headphone_watchid:
       fd, eventmask = self.headphone_mixer.polldescriptors()[0]
       self.headphone_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
@@ -304,14 +300,12 @@ class DDP(Thread):
     audio = self.read_audio_settings()
     if me:
       if (me['audio']['capture']['value']['left'] != audio['capture']['value']['left'] or
-          me['audio']['rearMicBoost']['value']['left'] != audio['rearMicBoost']['value']['left'] or
           me['audio']['headphone']['value']['left'] != audio['headphone']['value']['left']):
         self.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
 
   def read_audio_settings(self):
     audio_settings = {
       'capture': self.control_values(self.capture_mixer, 'capture'),
-      'rearMicBoost': self.control_values(self.boost_mixer, 'capture'),
       'headphone': self.control_values(self.headphone_mixer, 'playback')
     }
     self.capture_mixer.setrec(1)
