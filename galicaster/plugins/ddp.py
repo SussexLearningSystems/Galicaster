@@ -249,12 +249,12 @@ class DDP(Thread):
 
   def on_changed(self, collection, id, fields, cleared):
     me = self.client.find_one('rooms')
-    level = me['audio']['capture']['value']['left']
+    level = me['audio']['capture']['level']
     l, r = self.capture_mixer.getvolume('capture')
     if l != level:
       self.capture_mixer.setvolume(level, 0, 'capture')
       self.capture_mixer.setvolume(level, 1, 'capture')
-    level = me['audio']['headphone']['value']['left']
+    level = me['audio']['headphone']['level']
     l, r = self.headphone_mixer.getvolume('playback')
     if l != level:
       self.headphone_mixer.setvolume(level, 0, 'playback')
@@ -301,8 +301,8 @@ class DDP(Thread):
     me = self.client.find_one('rooms')
     audio = self.read_audio_settings()
     if me:
-      if (me['audio']['capture']['value']['left'] != audio['capture']['value']['left'] or
-          me['audio']['headphone']['value']['left'] != audio['headphone']['value']['left']):
+      if (me['audio']['capture']['level'] != audio['capture']['level'] or
+          me['audio']['headphone']['level'] != audio['headphone']['level']):
         self.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
 
   def read_audio_settings(self):
@@ -319,12 +319,8 @@ class DDP(Thread):
     return audio_settings
 
   def control_values(self, mixer, direction):
-    controls = {}
-    minimum, maximum = mixer.getrange(direction)
-    controls['limits'] = {'min': minimum, 'max': maximum}
     left, right = mixer.getvolume(direction)
-    controls['value'] = {
-      'left': left,
-      'right': right
+    controls = {
+      'level' = left
     }
     return controls
