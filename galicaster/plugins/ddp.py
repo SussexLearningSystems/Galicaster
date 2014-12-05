@@ -44,6 +44,7 @@ class DDP(Thread):
     self.id = conf.get('ingest', 'hostname')
     self.capture_mixer = alsaaudio.Mixer(control='Capture')
     self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
+    self.digital_mixer = alsaaudio.Mixer(control='Digital')
     self.headphone_mixer = alsaaudio.Mixer(control='Headphone')
     self.capture_watchid = None
     self.headphone_watchid = None
@@ -161,6 +162,7 @@ class DDP(Thread):
       self.capture_mixer = alsaaudio.Mixer(control='Capture')
       self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
       self.headphone_mixer = alsaaudio.Mixer(control='Headphone')
+      self.digital_mixer = alsaaudio.Mixer(control='Digital')
     self.update_audio()
     return True
 
@@ -312,6 +314,8 @@ class DDP(Thread):
     self.headphone_mixer.setmute(0)
     self.boost_mixer.setvolume(0, 0, 'capture')
     self.boost_mixer.setvolume(0, 1, 'capture')
+    self.digital_mixer.setvolume(50, 0, 'capture')
+    self.digital_mixer.setvolume(50, 1, 'capture')
     return audio_settings
 
   def control_values(self, mixer, direction):
