@@ -321,6 +321,6 @@ class DDP(Thread):
   def control_values(self, mixer, direction):
     left, right = mixer.getvolume(direction)
     controls = {
-      'level' = left
+      'level': left
     }
     return controls
