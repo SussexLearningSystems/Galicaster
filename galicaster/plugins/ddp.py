@@ -251,12 +251,12 @@ class DDP(Thread):
   def on_changed(self, collection, id, fields, cleared):
     audio = fields.get('audio')
     if audio:
-      level = audio.get('captureLevel')
+      level = audio[0].get('level')
       l, r = self.capture_mixer.getvolume('capture')
       if level and l != level:
         self.capture_mixer.setvolume(level, 0, 'capture')
         self.capture_mixer.setvolume(level, 1, 'capture')
-      level = audio.get('headphoneLevel')
+      level = audio[1].get('level')
       l, r = self.headphone_mixer.getvolume('playback')
       if level and l != level:
         self.headphone_mixer.setvolume(level, 0, 'playback')
@@ -305,15 +305,15 @@ class DDP(Thread):
     audio = self.read_audio_settings()
     if me:
       mAudio = me.get('audio')
-      if (mAudio.get('captureLevel') != audio.get('captureLevel') or
-          mAudio.get('headphoneLevel') != audio.get('headphoneLevel')):
+      if (mAudio[0].get('level') != audio[0].get('level') or
+          mAudio[1].get('level') != audio[1].get('level')):
         self.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
 
   def read_audio_settings(self):
-    audio_settings = {
-      'captureLevel': self.control_values(self.capture_mixer, 'capture'),
-      'headphoneLevel': self.control_values(self.headphone_mixer, 'playback')
-    }
+    audio_settings = [
+      self.control_values(self.capture_mixer, 'capture'),
+      self.control_values(self.headphone_mixer, 'playback')
+    ]
     self.capture_mixer.setrec(1)
     self.headphone_mixer.setmute(0)
     self.boost_mixer.setvolume(0, 0, 'capture')
@@ -323,5 +323,16 @@ class DDP(Thread):
     return audio_settings
 
   def control_values(self, mixer, direction):
+    controls = {}
     left, right = mixer.getvolume(direction)
-    return left
+    name = mixer.mixer()
+    if name == 'Capture':
+      minimum, maximum = -1650, 3000
+    else:
+      minimum, maximum = -6525, 0
+    controls['min'] = minimum
+    controls['max'] = maximum
+    controls['level'] = left
+    controls['type'] = direction
+    controls['name'] = name
+    return controls
