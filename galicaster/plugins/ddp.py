@@ -42,12 +42,6 @@ class DDP(Thread):
     self.do_vu = 0
     self.ip = socket.gethostbyname(socket.gethostname())
     self.id = conf.get('ingest', 'hostname')
-    self.capture_mixer = alsaaudio.Mixer(control='Capture')
-    self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
-    self.digital_mixer = alsaaudio.Mixer(control='Digital')
-    self.headphone_mixer = alsaaudio.Mixer(control='Headphone')
-    self.capture_watchid = None
-    self.headphone_watchid = None
     self._user = conf.get('ddp', 'user')
     self._password = conf.get('ddp', 'password')
     self._http_host = conf.get('ddp', 'http_host')
@@ -62,6 +56,26 @@ class DDP(Thread):
       self.cam_available = 0
     else:
       self.cam_available = int(cam_available)
+
+    self.audiofaders = []
+    self.mixers = {}
+    faders = conf.get('ddp', 'audiofaders').split()
+    for fader in faders:
+        audiofader = {}
+        fader = 'audiofader-' + fader
+        audiofader['name'] = conf.get(fader, 'name')
+        audiofader['display'] = conf.get(fader, 'display')
+        audiofader['min'] = conf.get_int(fader, 'min')
+        audiofader['max'] = conf.get_int(fader, 'max')
+        audiofader['direction'] = conf.get(fader, 'direction')
+        mixer = {}
+        mixer['control'] = alsaaudio.Mixer(control=audiofader['name'])
+        mixer['watchid'] = None
+        self.mixers[audiofader['name']] = mixer
+        self.audiofaders.append(audiofader)
+
+    self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
+    self.digital_mixer = alsaaudio.Mixer(control='Digital')
 
     dispatcher.connect('galicaster-init', self.on_init)
     dispatcher.connect('update-rec-vumeter', self.vumeter)
@@ -159,9 +173,12 @@ class DDP(Thread):
 
   def mixer_changed(self, source=None, condition=None, reopen=True):
     if reopen:
-      self.capture_mixer = alsaaudio.Mixer(control='Capture')
+      for audiofader in self.audiofaders:
+        mixer = {}
+        mixer['control'] = alsaaudio.Mixer(control=audiofader['name'])
+        mixer['watchid'] = None
+        self.mixers[audiofader['name']] = mixer
       self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
-      self.headphone_mixer = alsaaudio.Mixer(control='Headphone')
       self.digital_mixer = alsaaudio.Mixer(control='Digital')
     self.update_audio()
     return True
@@ -249,18 +266,16 @@ class DDP(Thread):
       })
 
   def on_changed(self, collection, id, fields, cleared):
-    audio = fields.get('audio')
-    if audio:
-      level = audio[0].get('level')
-      l, r = self.capture_mixer.getvolume('capture')
-      if level and l != level:
-        self.capture_mixer.setvolume(level, 0, 'capture')
-        self.capture_mixer.setvolume(level, 1, 'capture')
-      level = audio[1].get('level')
-      l, r = self.headphone_mixer.getvolume('playback')
-      if level and l != level:
-        self.headphone_mixer.setvolume(level, 0, 'playback')
-        self.headphone_mixer.setvolume(level, 1, 'playback')
+    faders = fields.get('audio')
+    if faders:
+      for fader in faders:
+        level = fader.get('level')
+        mixer = self.mixers[fader['name']]['control']
+        l, r = mixer.getvolume(fader['type'])
+        if level >= 0 and l != level:
+          mixer.setvolume(level, 0, fader['type'])
+          mixer.setvolume(level, 1, fader['type'])
+
     me = self.client.find_one('rooms')
     if self.paused != me['paused']:
       self.set_paused(me['paused'])
@@ -288,13 +303,11 @@ class DDP(Thread):
   def on_connected(self):
     logger.info('Connected to Meteor')
     self.client.login(self._user, self._password)
-
-    if not self.capture_watchid:
-      fd, eventmask = self.capture_mixer.polldescriptors()[0]
-      self.capture_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
-    if not self.headphone_watchid:
-      fd, eventmask = self.headphone_mixer.polldescriptors()[0]
-      self.headphone_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
+    print self.mixers
+    for key, mixer in self.mixers.iteritems():
+      if not mixer['watchid']:
+        fd, eventmask = mixer['control'].polldescriptors()[0]
+        mixer['watchid'] = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
 
   def on_closed(self, code, reason):
     self.has_disconnected = True
@@ -305,34 +318,37 @@ class DDP(Thread):
     audio = self.read_audio_settings()
     if me:
       mAudio = me.get('audio')
-      if (mAudio[0].get('level') != audio[0].get('level') or
-          mAudio[1].get('level') != audio[1].get('level')):
+      update = False
+      for key, fader in enumerate(audio):
+        if mAudio[key].get('level') != fader.get('level'):
+          update = True
+      if update:
         self.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
 
   def read_audio_settings(self):
-    audio_settings = [
-      self.control_values(self.capture_mixer, 'capture'),
-      self.control_values(self.headphone_mixer, 'playback')
-    ]
-    self.capture_mixer.setrec(1)
-    self.headphone_mixer.setmute(0)
+    audio_settings = []
+
+    for audiofader in self.audiofaders:
+      audio_settings.append(
+        self.control_values(
+          self.mixers[audiofader['name']]['control'], audiofader
+        )
+      )
+    # self.capture_mixer.setrec(1)
+    # self.headphone_mixer.setmute(0)
     self.boost_mixer.setvolume(0, 0, 'capture')
     self.boost_mixer.setvolume(0, 1, 'capture')
     self.digital_mixer.setvolume(50, 0, 'capture')
     self.digital_mixer.setvolume(50, 1, 'capture')
     return audio_settings
 
-  def control_values(self, mixer, direction):
+  def control_values(self, mixer, audiofader):
     controls = {}
-    left, right = mixer.getvolume(direction)
-    name = mixer.mixer()
-    if name == 'Capture':
-      minimum, maximum = -1650, 3000
-    else:
-      minimum, maximum = -6525, 0
-    controls['min'] = minimum
-    controls['max'] = maximum
+    left, right = mixer.getvolume(audiofader['direction'])
+    controls['min'] = audiofader['min']
+    controls['max'] = audiofader['max']
     controls['level'] = left
-    controls['type'] = direction
-    controls['name'] = name
+    controls['type'] = audiofader['direction']
+    controls['name'] = audiofader['name']
+    controls['display'] = audiofader['display']
     return controls
