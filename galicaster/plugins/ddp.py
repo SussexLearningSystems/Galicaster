@@ -67,7 +67,11 @@ class DDP(Thread):
         audiofader['display'] = conf.get(fader, 'display')
         audiofader['min'] = conf.get_int(fader, 'min')
         audiofader['max'] = conf.get_int(fader, 'max')
-        audiofader['direction'] = conf.get(fader, 'direction')
+        audiofader['type'] = conf.get(fader, 'type')
+        audiofader['setrec'] = conf.get_boolean(fader, 'setrec')
+        audiofader['mute'] = conf.get_boolean(fader, 'mute')
+        audiofader['unmute'] = conf.get_boolean(fader, 'unmute')
+        audiofader['setlevel'] = conf.get_int(fader, 'setlevel')
         mixer = {}
         mixer['control'] = alsaaudio.Mixer(control=audiofader['name'])
         mixer['watchid'] = None
@@ -303,7 +307,6 @@ class DDP(Thread):
   def on_connected(self):
     logger.info('Connected to Meteor')
     self.client.login(self._user, self._password)
-    print self.mixers
     for key, mixer in self.mixers.iteritems():
       if not mixer['watchid']:
         fd, eventmask = mixer['control'].polldescriptors()[0]
@@ -327,28 +330,33 @@ class DDP(Thread):
 
   def read_audio_settings(self):
     audio_settings = []
-
     for audiofader in self.audiofaders:
-      audio_settings.append(
-        self.control_values(
-          self.mixers[audiofader['name']]['control'], audiofader
+      mixer = self.mixers[audiofader['name']]['control']
+      if audiofader['display']:
+        audio_settings.append(
+          self.control_values(
+            mixer, audiofader
+          )
         )
-      )
-    # self.capture_mixer.setrec(1)
-    # self.headphone_mixer.setmute(0)
-    self.boost_mixer.setvolume(0, 0, 'capture')
-    self.boost_mixer.setvolume(0, 1, 'capture')
-    self.digital_mixer.setvolume(50, 0, 'capture')
-    self.digital_mixer.setvolume(50, 1, 'capture')
+      #ensure fixed values
+      if audiofader['setrec']:
+        mixer.setrec(1)
+      if audiofader['mute']:
+        mixer.setmute(1)
+      if audiofader['unmute']:
+        mixer.setmute(0)
+      if audiofader['setlevel'] >= 0:
+        mixer.setvolume(audiofader['setlevel'], 0, audiofader['type'])
+        mixer.setvolume(audiofader['setlevel'], 1, audiofader['type'])
     return audio_settings
 
   def control_values(self, mixer, audiofader):
     controls = {}
-    left, right = mixer.getvolume(audiofader['direction'])
+    left, right = mixer.getvolume(audiofader['type'])
     controls['min'] = audiofader['min']
     controls['max'] = audiofader['max']
     controls['level'] = left
-    controls['type'] = audiofader['direction']
+    controls['type'] = audiofader['type']
     controls['name'] = audiofader['name']
     controls['display'] = audiofader['display']
     return controls
