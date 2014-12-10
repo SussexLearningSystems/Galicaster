@@ -79,9 +79,6 @@ class DDP(Thread):
         self.mixers[audiofader['name']] = mixer
         self.audiofaders.append(audiofader)
 
-    self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
-    self.digital_mixer = alsaaudio.Mixer(control='Digital')
-
     dispatcher.connect('galicaster-init', self.on_init)
     dispatcher.connect('update-rec-vumeter', self.vumeter)
     dispatcher.connect('galicaster-notify-timer-short', self.heartbeat)
@@ -183,8 +180,6 @@ class DDP(Thread):
         mixer['control'] = alsaaudio.Mixer(control=audiofader['name'])
         mixer['watchid'] = None
         self.mixers[audiofader['name']] = mixer
-      self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
-      self.digital_mixer = alsaaudio.Mixer(control='Digital')
     self.update_audio()
     return True
 
