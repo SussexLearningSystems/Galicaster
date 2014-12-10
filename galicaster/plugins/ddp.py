@@ -30,6 +30,7 @@ class DDP(Thread):
     self.meteor = conf.get('ddp', 'meteor')
 
     self.client = MeteorClient(self.meteor, debug=False)
+    self.client.on('added', self.on_added)
     self.client.on('changed', self.on_changed)
     self.client.on('subscribed', self.on_subscribed)
     self.client.on('connected', self.on_connected)
@@ -42,10 +43,6 @@ class DDP(Thread):
     self.do_vu = 0
     self.ip = socket.gethostbyname(socket.gethostname())
     self.id = conf.get('ingest', 'hostname')
-    self.capture_mixer = alsaaudio.Mixer(control='Capture')
-    self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
-    self.capture_watchid = None
-    self.boost_watchid = None
     self._user = conf.get('ddp', 'user')
     self._password = conf.get('ddp', 'password')
     self._http_host = conf.get('ddp', 'http_host')
@@ -60,6 +57,30 @@ class DDP(Thread):
       self.cam_available = 0
     else:
       self.cam_available = int(cam_available)
+
+    self.audiofaders = []
+    self.mixers = {}
+    faders = conf.get('ddp', 'audiofaders').split()
+    for fader in faders:
+        audiofader = {}
+        fader = 'audiofader-' + fader
+        audiofader['name'] = conf.get(fader, 'name')
+        audiofader['display'] = conf.get(fader, 'display')
+        audiofader['min'] = conf.get_int(fader, 'min')
+        audiofader['max'] = conf.get_int(fader, 'max')
+        audiofader['type'] = conf.get(fader, 'type')
+        audiofader['setrec'] = conf.get_boolean(fader, 'setrec')
+        audiofader['mute'] = conf.get_boolean(fader, 'mute')
+        audiofader['unmute'] = conf.get_boolean(fader, 'unmute')
+        audiofader['setlevel'] = conf.get_int(fader, 'setlevel')
+        mixer = {}
+        mixer['control'] = alsaaudio.Mixer(control=audiofader['name'])
+        mixer['watchid'] = None
+        self.mixers[audiofader['name']] = mixer
+        self.audiofaders.append(audiofader)
+
+    self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
+    self.digital_mixer = alsaaudio.Mixer(control='Digital')
 
     dispatcher.connect('galicaster-init', self.on_init)
     dispatcher.connect('update-rec-vumeter', self.vumeter)
@@ -157,10 +178,13 @@ class DDP(Thread):
 
   def mixer_changed(self, source=None, condition=None, reopen=True):
     if reopen:
-      del self.capture_mixer
-      self.capture_mixer = alsaaudio.Mixer(control='Capture')
-      del self.boost_mixer
+      for audiofader in self.audiofaders:
+        mixer = {}
+        mixer['control'] = alsaaudio.Mixer(control=audiofader['name'])
+        mixer['watchid'] = None
+        self.mixers[audiofader['name']] = mixer
       self.boost_mixer = alsaaudio.Mixer(control='Rear Mic Boost')
+      self.digital_mixer = alsaaudio.Mixer(control='Digital')
     self.update_audio()
     return True
 
@@ -245,15 +269,23 @@ class DDP(Thread):
         'camAvailable': self.cam_available
       })
 
+  def set_audio(self, fields):
+    faders = fields.get('audio')
+    if faders:
+      for fader in faders:
+        level = fader.get('level')
+        mixer = self.mixers[fader['name']]['control']
+        l, r = mixer.getvolume(fader['type'])
+        if level >= 0 and l != level:
+          mixer.setvolume(level, 0, fader['type'])
+          mixer.setvolume(level, 1, fader['type'])
+
+  def on_added(self, collection, id, fields):
+    self.set_audio(fields)
+
   def on_changed(self, collection, id, fields, cleared):
+    self.set_audio(fields)
     me = self.client.find_one('rooms')
-    level = int((float(me['audio']['capture']['value']['left']) / float(me['audio']['capture']['limits']['max'])) * 100)
-    self.capture_mixer.setvolume(level, 0, 'capture')
-    self.capture_mixer.setvolume(level, 1, 'capture')
-    level = int(
-      (float(me['audio']['rearMicBoost']['value']['left']) / float(me['audio']['rearMicBoost']['limits']['max'])) * 100)
-    self.boost_mixer.setvolume(level, 0, 'capture')
-    self.boost_mixer.setvolume(level, 1, 'capture')
     if self.paused != me['paused']:
       self.set_paused(me['paused'])
     if context.get_state().is_recording != me['recording']:
@@ -280,13 +312,10 @@ class DDP(Thread):
   def on_connected(self):
     logger.info('Connected to Meteor')
     self.client.login(self._user, self._password)
-
-    if not self.capture_watchid:
-      fd, eventmask = self.capture_mixer.polldescriptors()[0]
-      self.capture_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
-    if not self.boost_watchid:
-      fd, eventmask = self.boost_mixer.polldescriptors()[0]
-      self.boost_watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
+    for key, mixer in self.mixers.iteritems():
+      if not mixer['watchid']:
+        fd, eventmask = mixer['control'].polldescriptors()[0]
+        mixer['watchid'] = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
 
   def on_closed(self, code, reason):
     self.has_disconnected = True
@@ -296,25 +325,43 @@ class DDP(Thread):
     me = self.client.find_one('rooms')
     audio = self.read_audio_settings()
     if me:
-      if ((int(me['audio']['capture']['value']['left']) != int(audio['capture']['value']['left'])) or
-            (int(me['audio']['rearMicBoost']['value']['left']) != int(audio['rearMicBoost']['value']['left']))):
+      mAudio = me.get('audio')
+      update = False
+      for key, fader in enumerate(audio):
+        if mAudio[key].get('level') != fader.get('level'):
+          update = True
+      if update:
         self.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
 
   def read_audio_settings(self):
-    audio_settings = {
-      'capture': self.control_values(self.capture_mixer),
-      'rearMicBoost': self.control_values(self.boost_mixer)
-    }
-    self.capture_mixer.setrec(1)
+    audio_settings = []
+    for audiofader in self.audiofaders:
+      mixer = self.mixers[audiofader['name']]['control']
+      if audiofader['display']:
+        audio_settings.append(
+          self.control_values(
+            mixer, audiofader
+          )
+        )
+      #ensure fixed values
+      if audiofader['setrec']:
+        mixer.setrec(1)
+      if audiofader['mute']:
+        mixer.setmute(1)
+      if audiofader['unmute']:
+        mixer.setmute(0)
+      if audiofader['setlevel'] >= 0:
+        mixer.setvolume(audiofader['setlevel'], 0, audiofader['type'])
+        mixer.setvolume(audiofader['setlevel'], 1, audiofader['type'])
     return audio_settings
 
-  def control_values(self, mixer):
+  def control_values(self, mixer, audiofader):
     controls = {}
-    minimum, maximum = mixer.getrange('capture')
-    controls['limits'] = {'min': minimum, 'max': maximum}
-    left, right = mixer.getvolume('capture')
-    controls['value'] = {
-      'left': int(round((float(left) / 100) * maximum)),
-      'right': int(round((float(right) / 100) * maximum))
-    }
+    left, right = mixer.getvolume(audiofader['type'])
+    controls['min'] = audiofader['min']
+    controls['max'] = audiofader['max']
+    controls['level'] = left
+    controls['type'] = audiofader['type']
+    controls['name'] = audiofader['name']
+    controls['display'] = audiofader['display']
     return controls
