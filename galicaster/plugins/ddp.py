@@ -30,6 +30,7 @@ class DDP(Thread):
     self.meteor = conf.get('ddp', 'meteor')
 
     self.client = MeteorClient(self.meteor, debug=False)
+    self.client.on('added', self.on_added)
     self.client.on('changed', self.on_changed)
     self.client.on('subscribed', self.on_subscribed)
     self.client.on('connected', self.on_connected)
@@ -244,12 +245,10 @@ class DDP(Thread):
 
   def on_subscribed(self, subscription):
     me = self.client.find_one('rooms')
-    audio = self.read_audio_settings()
     if me:
       self.update('rooms', {'_id': self.id}, {
         '$set': {
           'displayName': self.displayName,
-          'audio': audio,
           'ip': self.ip,
           'paused': False,
           'recording': False,
@@ -258,6 +257,7 @@ class DDP(Thread):
         }
       })
     else:
+      audio = self.read_audio_settings()
       self.insert('rooms', {
         '_id': self.id,
         'displayName': self.displayName,
@@ -269,7 +269,7 @@ class DDP(Thread):
         'camAvailable': self.cam_available
       })
 
-  def on_changed(self, collection, id, fields, cleared):
+  def set_audio(self, fields):
     faders = fields.get('audio')
     if faders:
       for fader in faders:
@@ -280,6 +280,11 @@ class DDP(Thread):
           mixer.setvolume(level, 0, fader['type'])
           mixer.setvolume(level, 1, fader['type'])
 
+  def on_added(self, collection, id, fields):
+    self.set_audio(fields)
+
+  def on_changed(self, collection, id, fields, cleared):
+    self.set_audio(fields)
     me = self.client.find_one('rooms')
     if self.paused != me['paused']:
       self.set_paused(me['paused'])
