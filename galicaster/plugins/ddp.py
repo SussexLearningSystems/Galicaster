@@ -269,11 +269,12 @@ class DDP(Thread):
     if faders:
       for fader in faders:
         level = fader.get('level')
-        mixer = self.mixers[fader['name']]['control']
-        l, r = mixer.getvolume(fader['type'])
-        if level >= 0 and l != level:
-          mixer.setvolume(level, 0, fader['type'])
-          mixer.setvolume(level, 1, fader['type'])
+        if fader['name'] in self.mixers:
+            mixer = self.mixers[fader['name']]['control']
+            l, r = mixer.getvolume(fader['type'])
+            if level >= 0 and l != level:
+              mixer.setvolume(level, 0, fader['type'])
+              mixer.setvolume(level, 1, fader['type'])
 
   def on_added(self, collection, id, fields):
     self.set_audio(fields)
