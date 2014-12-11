@@ -46,6 +46,7 @@ class DDP(Thread):
     self._user = conf.get('ddp', 'user')
     self._password = conf.get('ddp', 'password')
     self._http_host = conf.get('ddp', 'http_host')
+    self.netreg_id = conf.get('ddp', 'netreg_id')
     self.paused = False
     self.recording = False
     self.has_disconnected = False
@@ -248,7 +249,8 @@ class DDP(Thread):
           'paused': False,
           'recording': False,
           'heartbeat': int(time.time()),
-          'camAvailable': self.cam_available
+          'camAvailable': self.cam_available,
+          'netregId': self.netreg_id
         }
       })
     else:
@@ -261,7 +263,8 @@ class DDP(Thread):
         'paused': False,
         'recording': False,
         'heartbeat': int(time.time()),
-        'camAvailable': self.cam_available
+        'camAvailable': self.cam_available,
+        'netregId': self.netreg_id
       })
 
   def set_audio(self, fields):
