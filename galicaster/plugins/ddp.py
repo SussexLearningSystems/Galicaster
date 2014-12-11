@@ -277,6 +277,7 @@ class DDP(Thread):
 
   def on_added(self, collection, id, fields):
     self.set_audio(fields)
+    self.update_audio()
 
   def on_changed(self, collection, id, fields, cleared):
     self.set_audio(fields)
@@ -323,7 +324,7 @@ class DDP(Thread):
       mAudio = me.get('audio')
       update = False
       for key, fader in enumerate(audio):
-        if mAudio[key].get('level') != fader.get('level'):
+        if not key in mAudio or mAudio[key].get('level') != fader.get('level'):
           update = True
       if update:
         self.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
