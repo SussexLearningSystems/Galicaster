@@ -250,7 +250,8 @@ class DDP(Thread):
           'recording': False,
           'heartbeat': int(time.time()),
           'camAvailable': self.cam_available,
-          'netregId': self.netreg_id
+          'netregId': self.netreg_id,
+          'inputs': self.inputs()
         }
       })
     else:
@@ -264,8 +265,24 @@ class DDP(Thread):
         'recording': False,
         'heartbeat': int(time.time()),
         'camAvailable': self.cam_available,
-        'netregId': self.netreg_id
+        'netregId': self.netreg_id,
+        'inputs': self.inputs()
       })
+
+  def inputs(self):
+      inputs = {
+        'screens': ['Screen']
+      }
+      if self.cam_available == 1:
+          inputs['cameras'] = ['Camera']
+      else:
+          inputs['cameras'] = []
+          labels = conf.get('sussexlogin', 'matrix_cam_labels')
+          if labels:
+              cam_labels = [l.strip() for l in labels.split(',')]
+              for cam_label in cam_labels:
+                  inputs['cameras'].append(cam_label)
+      return inputs
 
   def set_audio(self, fields):
     faders = fields.get('audio')
