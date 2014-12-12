@@ -114,9 +114,6 @@ class DDP(Thread):
   def heartbeat(self, element):
     if self.client.connected:
         self.update_screenshots()
-        self.update('rooms', {'_id': self.id},
-          {'$set': {'heartbeat': int(time.time())}}
-        )
     else:
       self.connect()
 
