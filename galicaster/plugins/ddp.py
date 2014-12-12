@@ -167,7 +167,8 @@ class DDP(Thread):
     im.save(output, format="JPEG")
     files['screen'] = ('screen.jpg', output.getvalue(), 'image/jpeg')
     try:
-      requests.post("%s/image/%s" % (self._http_host, self.id), files=files)
+      # add verify=False for testing self signed certs
+      requests.post("%s/image/%s" % (self._http_host, self.id), files=files, auth=(self._user, self._password))
     except Exception:
       logger.warn('Unable to post images')
 
