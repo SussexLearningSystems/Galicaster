@@ -185,11 +185,8 @@ class DDP(Thread):
 
   def vumeter(self, element, data):
     if self.do_vu == 0:
-      data_aux = data
-      minimum = float(self.vu_min)
-
       if data == "Inf":
-        valor = 0
+        data = 0
       else:
         if data < -self.vu_range:
           data = -self.vu_range
@@ -198,7 +195,7 @@ class DDP(Thread):
       data = int(((data + self.vu_range) / float(self.vu_range)) * 100)
       update = {'vumeter': data}
       self.update('rooms', {'_id': self.id}, {'$set': update})
-    self.do_vu = (self.do_vu + 1) % 4
+    self.do_vu = (self.do_vu + 1) % 20
 
   def on_rec_status_update(self, element, data):
     is_paused = data == 'Paused'
