@@ -273,15 +273,14 @@ class DDP(Thread):
       inputs = {
         'screens': ['Screen']
       }
-      if self.cam_available == 1:
-          inputs['cameras'] = ['Camera']
-      else:
-          inputs['cameras'] = []
-          labels = conf.get('sussexlogin', 'matrix_cam_labels')
-          if labels:
-              cam_labels = [l.strip() for l in labels.split(',')]
-              for cam_label in cam_labels:
-                  inputs['cameras'].append(cam_label)
+      inputs['cameras'] = []
+      labels = conf.get('sussexlogin', 'matrix_cam_labels')
+      cam_labels = []
+      if labels:
+          cam_labels = [l.strip() for l in labels.split(',')]
+      for i in range(0, self.cam_available):
+          label = cam_labels[i] if i < len(cam_labels) else "Camera %d" % (i + 1)
+          inputs['cameras'].append(label)
       return inputs
 
   def set_audio(self, fields):
