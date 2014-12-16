@@ -1,11 +1,18 @@
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+import os
+import requests
 from SocketServer import ThreadingMixIn
 import subprocess
 from threading import Thread
 
 from galicaster.core import context
 
+conf = context.get_conf()
 dispatcher = context.get_dispatcher()
+
+_http_host = conf.get('ddp', 'http_host')
+_id = conf.get('ingest', 'hostname')
+_port = conf.get('audiostream', 'port') or 31337
 
 
 def init():
@@ -16,7 +23,7 @@ class AudioStream(Thread):
     def __init__(self):
         Thread.__init__(self)
 
-        serveraddr = ('', 1234)
+        serveraddr = ('', _port)
         server = ThreadedHTTPServer(serveraddr, AudioStreamer)
         server.allow_reuse_address = True
         server.timeout = 30
@@ -41,17 +48,27 @@ class AudioStreamer(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'audio/mpeg')
         self.end_headers()
 
+    def _not_allowed(self):
+        self.send_response(403) # 200 OK http response
+        self.end_headers()
+
     def do_HEAD(self):
         self._writeheaders()
 
     def do_GET(self):
+        data = {'_id': _id, 'streamKey': self.path[1:]}
+        r = requests.post(_http_host + '/stream_key', data=data)
+        if r.status_code != 204:
+            self._not_allowed()
+            return
         try:
             self._writeheaders()
 
             DataChunkSize = 10000
 
-            command = 'gst-launch-0.10 alsasrc ! lamemp3enc target=1 bitrate=32 cbr=true ! filesink location=/dev/stdout'
-            p = subprocess.Popen(command, stdout=subprocess.PIPE, bufsize=-1, shell=True)
+            devnull = open(os.devnull, 'wb')
+            command = 'gst-launch-0.10 alsasrc ! lamemp3enc bitrate=128 cbr=true ! filesink location=/dev/stdout preroll-queue-len=0'
+            p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=devnull, bufsize=-1, shell=True)
 
             while(p.poll() is None):
                 stdoutdata = p.stdout.read(DataChunkSize)
