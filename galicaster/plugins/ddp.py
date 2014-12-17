@@ -7,6 +7,7 @@ import socket
 import subprocess
 from threading import Event, Thread
 import time
+import uuid
 
 import gobject
 from MeteorClient import MeteorClient
@@ -46,6 +47,7 @@ class DDP(Thread):
     self._user = conf.get('ddp', 'user')
     self._password = conf.get('ddp', 'password')
     self._http_host = conf.get('ddp', 'http_host')
+    self._audiostream_port = conf.get('audiostream', 'port') or 31337
     self.netreg_id = conf.get('ddp', 'netreg_id')
     self.paused = False
     self.recording = False
@@ -236,6 +238,7 @@ class DDP(Thread):
 
   def on_subscribed(self, subscription):
     me = self.client.find_one('rooms')
+    stream_key = uuid.uuid4().get_hex()
     if me:
       self.update('rooms', {'_id': self.id}, {
         '$set': {
@@ -246,7 +249,9 @@ class DDP(Thread):
           'heartbeat': int(time.time()),
           'camAvailable': self.cam_available,
           'netregId': self.netreg_id,
-          'inputs': self.inputs()
+          'inputs': self.inputs(),
+          'stream': {'port': self._audiostream_port,
+                     'key': stream_key}
         }
       })
     else:
@@ -261,7 +266,9 @@ class DDP(Thread):
         'heartbeat': int(time.time()),
         'camAvailable': self.cam_available,
         'netregId': self.netreg_id,
-        'inputs': self.inputs()
+        'inputs': self.inputs(),
+        'stream': {'port': self._audiostream_port,
+                   'key': stream_key}
       })
 
   def inputs(self):
