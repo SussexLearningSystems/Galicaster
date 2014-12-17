@@ -173,10 +173,8 @@ class DDP(Thread):
 
   def mixer_changed(self, source=None, condition=None, reopen=True):
     if reopen:
-      k = 0
       for audiofader in self.audiofaders:
-        self.audiofaders[k]['control'] = alsaaudio.Mixer(control=audiofader['name'])
-        k += 1
+        audiofader['control'] = alsaaudio.Mixer(control=audiofader['name'])
     self.update_audio()
     return True
 
@@ -277,20 +275,20 @@ class DDP(Thread):
       return inputs
 
   def set_audio(self, fields):
+    mixer = None
     faders = fields.get('audio')
     if faders:
       for fader in faders:
         level = fader.get('level')
-        k = 0
         for audiofader in self.audiofaders:
           if audiofader['name'] == fader['name']:
+            mixer = audiofader['control']
             break;
-          k += 1
-        mixer = self.audiofaders[k]['control']
-        l, r = mixer.getvolume(fader['type'])
-        if level >= 0 and l != level:
-          mixer.setvolume(level, 0, fader['type'])
-          mixer.setvolume(level, 1, fader['type'])
+        if mixer:
+          l, r = mixer.getvolume(fader['type'])
+          if level >= 0 and l != level:
+            mixer.setvolume(level, 0, fader['type'])
+            mixer.setvolume(level, 1, fader['type'])
 
   def on_added(self, collection, id, fields):
     self.set_audio(fields)
@@ -338,7 +336,7 @@ class DDP(Thread):
       update = False
       for key, fader in enumerate(audio):
         # update if not in db or value has changed
-        if not [x for x in mAudio if x['name'] == fader['name']] or mAudio[key].get('level') != fader.get('level'):
+        if mAudio[key].get('level') != fader.get('level') or not [x for x in mAudio if x['name'] == fader['name']]:
           update = True
       if update:
         self.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
