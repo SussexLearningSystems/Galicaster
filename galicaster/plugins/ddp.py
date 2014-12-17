@@ -76,9 +76,10 @@ class DDP(Thread):
         audiofader['setlevel'] = conf.get_int(fader, 'setlevel')
         mixer = {}
         mixer['control'] = alsaaudio.Mixer(control=audiofader['name'])
-        mixer['watchid'] = None
         self.mixers[audiofader['name']] = mixer
         self.audiofaders.append(audiofader)
+    fd, eventmask = self.mixers[self.audiofaders[0]['name']]['control'].polldescriptors()[0]
+    self.watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
 
     dispatcher.connect('galicaster-init', self.on_init)
     dispatcher.connect('update-rec-vumeter', self.vumeter)
@@ -175,10 +176,7 @@ class DDP(Thread):
   def mixer_changed(self, source=None, condition=None, reopen=True):
     if reopen:
       for audiofader in self.audiofaders:
-        mixer = {}
-        mixer['control'] = alsaaudio.Mixer(control=audiofader['name'])
-        mixer['watchid'] = None
-        self.mixers[audiofader['name']] = mixer
+        self.mixers[audiofader['name']]['control'] = alsaaudio.Mixer(control=audiofader['name'])
     self.update_audio()
     return True
 
@@ -323,10 +321,6 @@ class DDP(Thread):
   def on_connected(self):
     logger.info('Connected to Meteor')
     self.client.login(self._user, self._password)
-    for key, mixer in self.mixers.iteritems():
-      if not mixer['watchid']:
-        fd, eventmask = mixer['control'].polldescriptors()[0]
-        mixer['watchid'] = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
 
   def on_closed(self, code, reason):
     self.has_disconnected = True
@@ -339,7 +333,8 @@ class DDP(Thread):
       mAudio = me.get('audio')
       update = False
       for key, fader in enumerate(audio):
-        if not key in mAudio or mAudio[key].get('level') != fader.get('level'):
+        # update if not in db or value has changed
+        if not [x for x in mAudio if x['name'] == fader['name']] or mAudio[key].get('level') != fader.get('level'):
           update = True
       if update:
         self.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
