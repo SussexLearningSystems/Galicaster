@@ -60,7 +60,6 @@ class DDP(Thread):
       self.cam_available = int(cam_available)
 
     self.audiofaders = []
-    self.mixers = {}
     faders = conf.get('ddp', 'audiofaders').split()
     for fader in faders:
         audiofader = {}
@@ -74,12 +73,11 @@ class DDP(Thread):
         audiofader['mute'] = conf.get_boolean(fader, 'mute')
         audiofader['unmute'] = conf.get_boolean(fader, 'unmute')
         audiofader['setlevel'] = conf.get_int(fader, 'setlevel')
-        mixer = {}
-        mixer['control'] = alsaaudio.Mixer(control=audiofader['name'])
-        self.mixers[audiofader['name']] = mixer
+        audiofader['control'] = alsaaudio.Mixer(control=audiofader['name'])
         self.audiofaders.append(audiofader)
-    fd, eventmask = self.mixers[self.audiofaders[0]['name']]['control'].polldescriptors()[0]
+    fd, eventmask = self.audiofaders[0]['control'].polldescriptors()[0]
     self.watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
+
 
     dispatcher.connect('galicaster-init', self.on_init)
     dispatcher.connect('update-rec-vumeter', self.vumeter)
@@ -175,8 +173,10 @@ class DDP(Thread):
 
   def mixer_changed(self, source=None, condition=None, reopen=True):
     if reopen:
+      k = 0
       for audiofader in self.audiofaders:
-        self.mixers[audiofader['name']]['control'] = alsaaudio.Mixer(control=audiofader['name'])
+        self.audiofaders[k]['control'] = alsaaudio.Mixer(control=audiofader['name'])
+        k += 1
     self.update_audio()
     return True
 
@@ -281,12 +281,16 @@ class DDP(Thread):
     if faders:
       for fader in faders:
         level = fader.get('level')
-        if fader['name'] in self.mixers:
-            mixer = self.mixers[fader['name']]['control']
-            l, r = mixer.getvolume(fader['type'])
-            if level >= 0 and l != level:
-              mixer.setvolume(level, 0, fader['type'])
-              mixer.setvolume(level, 1, fader['type'])
+        k = 0
+        for audiofader in self.audiofaders:
+          if audiofader['name'] == fader['name']:
+            break;
+          k += 1
+        mixer = self.audiofaders[k]['control']
+        l, r = mixer.getvolume(fader['type'])
+        if level >= 0 and l != level:
+          mixer.setvolume(level, 0, fader['type'])
+          mixer.setvolume(level, 1, fader['type'])
 
   def on_added(self, collection, id, fields):
     self.set_audio(fields)
@@ -342,14 +346,12 @@ class DDP(Thread):
   def read_audio_settings(self):
     audio_settings = []
     for audiofader in self.audiofaders:
-      mixer = self.mixers[audiofader['name']]['control']
       if audiofader['display']:
         audio_settings.append(
-          self.control_values(
-            mixer, audiofader
-          )
+          self.control_values(audiofader)
         )
       #ensure fixed values
+      mixer = audiofader['control']
       if audiofader['setrec']:
         mixer.setrec(1)
       if audiofader['mute']:
@@ -361,9 +363,9 @@ class DDP(Thread):
         mixer.setvolume(audiofader['setlevel'], 1, audiofader['type'])
     return audio_settings
 
-  def control_values(self, mixer, audiofader):
+  def control_values(self, audiofader):
     controls = {}
-    left, right = mixer.getvolume(audiofader['type'])
+    left, right = audiofader['control'].getvolume(audiofader['type'])
     controls['min'] = audiofader['min']
     controls['max'] = audiofader['max']
     controls['level'] = left
