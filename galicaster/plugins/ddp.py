@@ -275,15 +275,15 @@ class DDP(Thread):
       return inputs
 
   def set_audio(self, fields):
-    mixer = None
     faders = fields.get('audio')
     if faders:
       for fader in faders:
+        mixer = None
         level = fader.get('level')
         for audiofader in self.audiofaders:
           if audiofader['name'] == fader['name']:
             mixer = audiofader['control']
-            break;
+            break
         if mixer:
           l, r = mixer.getvolume(fader['type'])
           if level >= 0 and l != level:
@@ -331,13 +331,17 @@ class DDP(Thread):
   def update_audio(self):
     me = self.client.find_one('rooms')
     audio = self.read_audio_settings()
+    update = False
     if me:
       mAudio = me.get('audio')
-      update = False
-      for key, fader in enumerate(audio):
-        # update if not in db or value has changed
-        if mAudio[key].get('level') != fader.get('level') or not [x for x in mAudio if x['name'] == fader['name']]:
+      mAudioNames = [x['name'] for x in mAudio]
+      audioNames = [x['name'] for x in audio]
+      if set(mAudioNames) != set(audioNames):
           update = True
+      if not update:
+          for key, fader in enumerate(audio):
+            if mAudio[key].get('level') != fader.get('level'):
+                update = True
       if update:
         self.update('rooms', {'_id': self.id}, {'$set': {'audio': audio}})
 
