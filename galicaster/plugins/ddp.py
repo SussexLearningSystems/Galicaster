@@ -167,31 +167,18 @@ class DDP(Thread):
 
     def _update_images(self, delay):
         time.sleep(delay)
-        images = [
-            {
-                'type': 'presentation',
-                'filename': 'presentation.jpg',
-                'file': '/tmp/SCREEN.avi.jpg'
-            },
-            {
-                'type': 'camera',
-                'filename': 'camera.jpg',
-                'file': '/tmp/CAMERA.avi.jpg'
-            }
-        ]
         files = {}
-        for image in images:
-            try:
-                if(os.path.getctime(image['file']) > time.time() - 3):
-                    files[
-                        image['type']] = (
-                        image['filename'],
-                        open(
-                            image['file'],
-                            'rb'),
-                        'image/jpeg')
-            except Exception:
-                pass
+        audio_devices = ['audiotest', 'autoaudio', 'pulse']
+        for track in context.get_state().profile.tracks:
+            if track.device not in audio_devices:
+                file = os.path.join('/tmp', track.file + '.jpg')
+                try:
+                    if(os.path.getctime(file) > time.time() - 3):
+                        files[track.flavor] = (track.flavor + '.jpg',
+                                               open(file, 'rb'),
+                                               'image/jpeg')
+                except Exception as e:
+                    pass
         im = ImageGrab.grab(bbox=(10, 10, 1280, 720), backend='imagemagick')
         im.thumbnail((640, 360))
         output = cStringIO.StringIO()
