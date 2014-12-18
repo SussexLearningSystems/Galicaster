@@ -174,7 +174,7 @@ class DDP(Thread):
                 'file': '/tmp/SCREEN.avi.jpg'
             },
             {
-                'type': 'presenter',
+                'type': 'camera',
                 'filename': 'camera.jpg',
                 'file': '/tmp/CAMERA.avi.jpg'
             }
@@ -198,7 +198,8 @@ class DDP(Thread):
         if im.mode != "RGB":
             im = im.convert("RGB")
         im.save(output, format="JPEG")
-        files['screen'] = ('screen.jpg', output.getvalue(), 'image/jpeg')
+        files['galicaster'] = ('galicaster.jpg', output.getvalue(),
+                               'image/jpeg')
         try:
             # add verify=False for testing self signed certs
             requests.post(
@@ -309,7 +310,7 @@ class DDP(Thread):
 
     def inputs(self):
         inputs = {
-            'screens': ['Screen']
+            'presentations': ['Presentation']
         }
         inputs['cameras'] = []
         labels = conf.get('sussexlogin', 'matrix_cam_labels')
