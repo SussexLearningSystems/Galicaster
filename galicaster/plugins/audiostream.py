@@ -19,7 +19,9 @@ def init():
     audiostream = AudioStream()
     audiostream.start()
 
+
 class AudioStream(Thread):
+
     def __init__(self):
         Thread.__init__(self)
 
@@ -39,17 +41,19 @@ class AudioStream(Thread):
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+
     """Handle requests in a separate thread."""
 
 
 class AudioStreamer(BaseHTTPRequestHandler):
+
     def _writeheaders(self):
-        self.send_response(200) # 200 OK http response
+        self.send_response(200)  # 200 OK http response
         self.send_header('Content-type', 'audio/mpeg')
         self.end_headers()
 
     def _not_allowed(self):
-        self.send_response(403) # 200 OK http response
+        self.send_response(403)  # 200 OK http response
         self.end_headers()
 
     def do_HEAD(self):
@@ -67,8 +71,15 @@ class AudioStreamer(BaseHTTPRequestHandler):
             DataChunkSize = 10000
 
             devnull = open(os.devnull, 'wb')
-            command = 'gst-launch-0.10 alsasrc ! lamemp3enc bitrate=128 cbr=true ! filesink location=/dev/stdout preroll-queue-len=0'
-            p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=devnull, bufsize=-1, shell=True)
+            command = 'gst-launch-0.10 alsasrc ! ' + \
+                      'lamemp3enc bitrate=128 cbr=true ! ' + \
+                      'filesink location=/dev/stdout preroll-queue-len=0'
+            p = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=devnull,
+                bufsize=-1,
+                shell=True)
 
             while(p.poll() is None):
                 stdoutdata = p.stdout.read(DataChunkSize)
