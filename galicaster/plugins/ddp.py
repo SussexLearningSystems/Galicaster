@@ -134,7 +134,7 @@ class DDP(Thread):
 
     def heartbeat(self, element):
         if self.client.connected:
-            self.update_screenshots()
+            self.update_images()
         else:
             self.connect()
 
@@ -156,16 +156,16 @@ class DDP(Thread):
                 '$unset': {
                     'currentMediaPackage': ''}, '$set': {
                     'recording': False}})
-        self.update_screenshots(1.5)
+        self.update_images(1.5)
 
     def on_init(self, data):
-        self.update_screenshots(1.5)
+        self.update_images(1.5)
 
-    def update_screenshots(self, delay=0):
-        worker = Thread(target=self._update_screenshots, args=(delay,))
+    def update_images(self, delay=0):
+        worker = Thread(target=self._update_images, args=(delay,))
         worker.start()
 
-    def _update_screenshots(self, delay):
+    def _update_images(self, delay):
         time.sleep(delay)
         images = [
             {
@@ -234,7 +234,7 @@ class DDP(Thread):
     def on_rec_status_update(self, element, data):
         is_paused = data == 'Paused'
         if is_paused:
-            self.update_screenshots(.75)
+            self.update_images(.75)
         if self.paused != is_paused:
             self.update(
                 'rooms', {
@@ -244,7 +244,7 @@ class DDP(Thread):
             self.paused = is_paused
         if data == '  Recording  ':
             subprocess.call(['killall', 'maliit-server'])
-            self.update_screenshots(.75)
+            self.update_images(.75)
 
     def media_package_metadata(self, id):
         mp = context.get_repository().get(id)
