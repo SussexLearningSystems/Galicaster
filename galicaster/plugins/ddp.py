@@ -177,8 +177,9 @@ class DDP(Thread):
                         files[track.flavor] = (track.flavor + '.jpg',
                                                open(file, 'rb'),
                                                'image/jpeg')
-                except Exception as e:
-                    pass
+                except Exception:
+                    logger.warn("Unable to check date of or open file (%s)"
+                                % file)
         im = ImageGrab.grab(bbox=(10, 10, 1280, 720), backend='imagemagick')
         im.thumbnail((640, 360))
         output = cStringIO.StringIO()
