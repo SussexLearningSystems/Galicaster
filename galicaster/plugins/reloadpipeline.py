@@ -17,8 +17,8 @@ def timer(signal=None):
     global last_reload
     last_reload += 1
     if last_reload == reload_every:
+        last_reload = 0
         if not context.get_state().is_recording:
-            last_reload = 0
             dispatcher.emit('reload-profile')
             logger.info('reload profile')
 
