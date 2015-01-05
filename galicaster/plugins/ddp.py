@@ -134,7 +134,7 @@ class DDP(Thread):
 
     def heartbeat(self, element):
         if self.client.connected:
-            self.update_screenshots()
+            self.update_images()
         else:
             self.connect()
 
@@ -156,49 +156,38 @@ class DDP(Thread):
                 '$unset': {
                     'currentMediaPackage': ''}, '$set': {
                     'recording': False}})
-        self.update_screenshots(1.5)
+        self.update_images(1.5)
 
     def on_init(self, data):
-        self.update_screenshots(1.5)
+        self.update_images(1.5)
 
-    def update_screenshots(self, delay=0):
-        worker = Thread(target=self._update_screenshots, args=(delay,))
+    def update_images(self, delay=0):
+        worker = Thread(target=self._update_images, args=(delay,))
         worker.start()
 
-    def _update_screenshots(self, delay):
+    def _update_images(self, delay):
         time.sleep(delay)
-        images = [
-            {
-                'type': 'presentation',
-                'filename': 'presentation.jpg',
-                'file': '/tmp/SCREEN.avi.jpg'
-            },
-            {
-                'type': 'presenter',
-                'filename': 'camera.jpg',
-                'file': '/tmp/CAMERA.avi.jpg'
-            }
-        ]
         files = {}
-        for image in images:
-            try:
-                if(os.path.getctime(image['file']) > time.time() - 3):
-                    files[
-                        image['type']] = (
-                        image['filename'],
-                        open(
-                            image['file'],
-                            'rb'),
-                        'image/jpeg')
-            except Exception:
-                pass
+        audio_devices = ['audiotest', 'autoaudio', 'pulse']
+        for track in context.get_state().profile.tracks:
+            if track.device not in audio_devices:
+                file = os.path.join('/tmp', track.file + '.jpg')
+                try:
+                    if(os.path.getctime(file) > time.time() - 3):
+                        files[track.flavor] = (track.flavor + '.jpg',
+                                               open(file, 'rb'),
+                                               'image/jpeg')
+                except Exception:
+                    logger.warn("Unable to check date of or open file (%s)"
+                                % file)
         im = ImageGrab.grab(bbox=(10, 10, 1280, 720), backend='imagemagick')
         im.thumbnail((640, 360))
         output = cStringIO.StringIO()
         if im.mode != "RGB":
             im = im.convert("RGB")
         im.save(output, format="JPEG")
-        files['screen'] = ('screen.jpg', output.getvalue(), 'image/jpeg')
+        files['galicaster'] = ('galicaster.jpg', output.getvalue(),
+                               'image/jpeg')
         try:
             # add verify=False for testing self signed certs
             requests.post(
@@ -233,7 +222,7 @@ class DDP(Thread):
     def on_rec_status_update(self, element, data):
         is_paused = data == 'Paused'
         if is_paused:
-            self.update_screenshots(.75)
+            self.update_images(.75)
         if self.paused != is_paused:
             self.update(
                 'rooms', {
@@ -243,7 +232,7 @@ class DDP(Thread):
             self.paused = is_paused
         if data == '  Recording  ':
             subprocess.call(['killall', 'maliit-server'])
-            self.update_screenshots(.75)
+            self.update_images(.75)
 
     def media_package_metadata(self, id):
         mp = context.get_repository().get(id)
@@ -309,7 +298,7 @@ class DDP(Thread):
 
     def inputs(self):
         inputs = {
-            'screens': ['Screen']
+            'presentations': ['Presentation']
         }
         inputs['cameras'] = []
         labels = conf.get('sussexlogin', 'matrix_cam_labels')
