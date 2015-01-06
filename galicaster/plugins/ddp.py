@@ -53,6 +53,7 @@ class DDP(Thread):
         self.netreg_id = conf.get('ddp', 'netreg_id')
         self.paused = False
         self.recording = False
+        self.media_package = ''
         self.has_disconnected = False
 
         cam_available = conf.get(
@@ -139,17 +140,20 @@ class DDP(Thread):
             self.connect()
 
     def on_start_recording(self, sender, id):
-        media_package = self.media_package_metadata(id)
+        self.recording = True
+        self.media_package = self.media_package_metadata(id)
         profile = context.get_state().profile.name
         self.update(
             'rooms', {
                 '_id': self.id}, {
                 '$set': {
-                    'currentMediaPackage': media_package,
+                    'currentMediaPackage': self.media_package,
                     'recording': True,
                     'currentProfile': profile}})
 
     def on_stop_recording(self, sender=None):
+        self.recording = False
+        self.media_package = ''
         self.update(
             'rooms', {
                 '_id': self.id}, {
@@ -270,13 +274,14 @@ class DDP(Thread):
                     'displayName': self.displayName,
                     'ip': self.ip,
                     'paused': False,
-                    'recording': False,
+                    'recording': self.recording,
                     'heartbeat': int(time.time()),
                     'camAvailable': self.cam_available,
                     'netregId': self.netreg_id,
                     'inputs': self.inputs(),
                     'stream': {'port': self._audiostream_port,
-                               'key': stream_key}
+                               'key': stream_key},
+                    'currentMediaPackage': self.media_package
                 }
             })
         else:
@@ -287,13 +292,14 @@ class DDP(Thread):
                 'audio': audio,
                 'ip': self.ip,
                 'paused': False,
-                'recording': False,
+                'recording': self.recording,
                 'heartbeat': int(time.time()),
                 'camAvailable': self.cam_available,
                 'netregId': self.netreg_id,
                 'inputs': self.inputs(),
                 'stream': {'port': self._audiostream_port,
-                           'key': stream_key}
+                           'key': stream_key},
+                'currentMediaPackage': self.media_package
             })
 
     def inputs(self):
