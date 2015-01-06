@@ -283,7 +283,7 @@ class DDP(Thread):
         data = {
             'displayName': self.displayName,
             'ip': self.ip,
-            'paused': False,
+            'paused': self.paused,
             'recording': self.recording,
             'heartbeat': int(time.time()),
             'camAvailable': self.cam_available,
