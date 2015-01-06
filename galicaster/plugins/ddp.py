@@ -53,7 +53,8 @@ class DDP(Thread):
         self.netreg_id = conf.get('ddp', 'netreg_id')
         self.paused = False
         self.recording = False
-        self.media_package = ''
+        self.currentMediaPackage = None
+        self.currentProfile = None
         self.has_disconnected = False
 
         cam_available = conf.get(
@@ -141,25 +142,34 @@ class DDP(Thread):
 
     def on_start_recording(self, sender, id):
         self.recording = True
-        self.media_package = self.media_package_metadata(id)
-        profile = context.get_state().profile.name
+        self.currentMediaPackage = self.media_package_metadata(id)
+        self.currentProfile = context.get_state().profile.name
         self.update(
             'rooms', {
-                '_id': self.id}, {
+                '_id': self.id
+            }, {
                 '$set': {
-                    'currentMediaPackage': self.media_package,
-                    'recording': True,
-                    'currentProfile': profile}})
+                    'currentMediaPackage': self.currentMediaPackage,
+                    'currentProfile': self.currentProfile,
+                    'recording': True
+                }
+            })
 
     def on_stop_recording(self, sender=None):
         self.recording = False
-        self.media_package = ''
+        self.currentMediaPackage = None
+        self.currentProfile = None
         self.update(
             'rooms', {
-                '_id': self.id}, {
+                '_id': self.id
+            }, {
                 '$unset': {
-                    'currentMediaPackage': ''}, '$set': {
-                    'recording': False}})
+                    'currentMediaPackage': '',
+                    'currentProfile': ''
+                }, '$set': {
+                    'recording': False
+                }
+            })
         self.update_images(1.5)
 
     def on_init(self, data):
@@ -268,39 +278,48 @@ class DDP(Thread):
     def on_subscribed(self, subscription):
         me = self.client.find_one('rooms')
         stream_key = uuid.uuid4().get_hex()
+
+        # Data to push when inserting or updating
+        data = {
+            'displayName': self.displayName,
+            'ip': self.ip,
+            'paused': False,
+            'recording': self.recording,
+            'heartbeat': int(time.time()),
+            'camAvailable': self.cam_available,
+            'netregId': self.netreg_id,
+            'inputs': self.inputs(),
+            'stream': {
+                'port': self._audiostream_port,
+                'key': stream_key
+            }
+        }
+        if self.currentMediaPackage:
+            data['currentMediaPackage'] = self.currentMediaPackage
+        if self.currentProfile:
+            data['currentProfile'] = self.currentProfile
+
         if me:
-            self.update('rooms', {'_id': self.id}, {
-                '$set': {
-                    'displayName': self.displayName,
-                    'ip': self.ip,
-                    'paused': False,
-                    'recording': self.recording,
-                    'heartbeat': int(time.time()),
-                    'camAvailable': self.cam_available,
-                    'netregId': self.netreg_id,
-                    'inputs': self.inputs(),
-                    'stream': {'port': self._audiostream_port,
-                               'key': stream_key},
-                    'currentMediaPackage': self.media_package
-                }
-            })
+            # Items to unset
+            unset = {}
+            if not self.currentMediaPackage:
+                unset['currentMediaPackage'] = ''
+            if not self.currentProfile:
+                unset['currentProfile'] = ''
+
+            # Update to push
+            update = {
+                '$set': data
+            }
+
+            if unset:
+                update['$unset'] = unset
+            self.update('rooms', {'_id': self.id}, update)
         else:
             audio = self.read_audio_settings()
-            self.insert('rooms', {
-                '_id': self.id,
-                'displayName': self.displayName,
-                'audio': audio,
-                'ip': self.ip,
-                'paused': False,
-                'recording': self.recording,
-                'heartbeat': int(time.time()),
-                'camAvailable': self.cam_available,
-                'netregId': self.netreg_id,
-                'inputs': self.inputs(),
-                'stream': {'port': self._audiostream_port,
-                           'key': stream_key},
-                'currentMediaPackage': self.media_package
-            })
+            data['_id'] = self.id
+            data['audio'] = audio
+            self.insert('rooms', data)
 
     def inputs(self):
         inputs = {
