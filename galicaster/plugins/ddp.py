@@ -151,7 +151,7 @@ class DDP(Thread):
                 '$set': {
                     'currentMediaPackage': self.currentMediaPackage,
                     'currentProfile': self.currentProfile,
-                    'recording': True
+                    'recording': self.recording
                 }
             })
 
@@ -167,7 +167,7 @@ class DDP(Thread):
                     'currentMediaPackage': '',
                     'currentProfile': ''
                 }, '$set': {
-                    'recording': False
+                    'recording': self.recording
                 }
             })
         self.update_images(1.5)
