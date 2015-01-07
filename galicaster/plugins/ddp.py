@@ -32,13 +32,13 @@ class DDP(Thread):
         Thread.__init__(self)
         self.meteor = conf.get('ddp', 'meteor')
 
-        self.client = MeteorClient(self.meteor, debug=False)
+        self.client = MeteorClient(self.meteor, debug=True)
         self.client.on('added', self.on_added)
         self.client.on('changed', self.on_changed)
         self.client.on('subscribed', self.on_subscribed)
         self.client.on('connected', self.on_connected)
-        self.client.on('reconnected', self.on_connected)
         self.client.on('closed', self.on_closed)
+        self.client.on('logged_in', self.on_logged_in)
 
         self.displayName = conf.get('sussexlogin', 'room_name')
         self.vu_min = -70
@@ -100,11 +100,6 @@ class DDP(Thread):
         if not self.has_disconnected:
             try:
                 self.client.connect()
-                self.client.subscribe(
-                    'GalicasterControl',
-                    params=[
-                        self.id],
-                    callback=self.subscription_callback)
             except Exception:
                 logger.warn('DDP connection failed')
 
@@ -385,6 +380,16 @@ class DDP(Thread):
     def on_connected(self):
         logger.info('Connected to Meteor')
         self.client.login(self._user, self._password)
+
+    def on_logged_in(self, data):
+        try:
+            self.client.subscribe(
+                'GalicasterControl',
+                params=[
+                    self.id],
+                callback=self.subscription_callback)
+        except Exception:
+            logger.warn('DDP subscription failed')
 
     def on_closed(self, code, reason):
         self.has_disconnected = True
