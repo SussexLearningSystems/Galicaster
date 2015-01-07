@@ -38,6 +38,7 @@ class DDP(Thread):
         self.client.on('subscribed', self.on_subscribed)
         self.client.on('connected', self.on_connected)
         self.client.on('reconnected', self.on_connected)
+        self.client.on('removed', self.on_removed)
         self.client.on('closed', self.on_closed)
 
         self.displayName = conf.get('sussexlogin', 'room_name')
@@ -338,6 +339,9 @@ class DDP(Thread):
             self.set_paused(me['paused'])
         if context.get_state().is_recording != me['recording']:
             self.set_recording(me)
+
+    def on_removed(self, collection, id):
+        self.on_subscribed(None)
 
     def set_paused(self, new_status):
         self.paused = new_status
