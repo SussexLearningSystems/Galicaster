@@ -32,7 +32,7 @@ class DDP(Thread):
         Thread.__init__(self)
         self.meteor = conf.get('ddp', 'meteor')
 
-        self.client = MeteorClient(self.meteor, debug=True)
+        self.client = MeteorClient(self.meteor, debug=False)
         self.client.on('added', self.on_added)
         self.client.on('changed', self.on_changed)
         self.client.on('subscribed', self.on_subscribed)
