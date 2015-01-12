@@ -37,6 +37,7 @@ class DDP(Thread):
         self.client.on('changed', self.on_changed)
         self.client.on('subscribed', self.on_subscribed)
         self.client.on('connected', self.on_connected)
+        self.client.on('removed', self.on_removed)
         self.client.on('closed', self.on_closed)
         self.client.on('logged_in', self.on_logged_in)
 
@@ -358,6 +359,9 @@ class DDP(Thread):
             self.set_paused(me['paused'])
         if context.get_state().is_recording != me['recording']:
             self.set_recording(me)
+
+    def on_removed(self, collection, id):
+        self.on_subscribed(None)
 
     def set_paused(self, new_status):
         self.paused = new_status
