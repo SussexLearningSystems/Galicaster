@@ -37,8 +37,8 @@ class DDP(Thread):
         self.client.on('changed', self.on_changed)
         self.client.on('subscribed', self.on_subscribed)
         self.client.on('connected', self.on_connected)
-        self.client.on('reconnected', self.on_connected)
         self.client.on('closed', self.on_closed)
+        self.client.on('logged_in', self.on_logged_in)
 
         self.displayName = conf.get('sussexlogin', 'room_name')
         self.vu_min = -70
@@ -53,6 +53,8 @@ class DDP(Thread):
         self.netreg_id = conf.get('ddp', 'netreg_id')
         self.paused = False
         self.recording = False
+        self.currentMediaPackage = None
+        self.currentProfile = None
         self.has_disconnected = False
 
         cam_available = conf.get(
@@ -98,11 +100,6 @@ class DDP(Thread):
         if not self.has_disconnected:
             try:
                 self.client.connect()
-                self.client.subscribe(
-                    'GalicasterControl',
-                    params=[
-                        self.id],
-                    callback=self.subscription_callback)
             except Exception:
                 logger.warn('DDP connection failed')
 
@@ -139,23 +136,35 @@ class DDP(Thread):
             self.connect()
 
     def on_start_recording(self, sender, id):
-        media_package = self.media_package_metadata(id)
-        profile = context.get_state().profile.name
+        self.recording = True
+        self.currentMediaPackage = self.media_package_metadata(id)
+        self.currentProfile = context.get_state().profile.name
         self.update(
             'rooms', {
-                '_id': self.id}, {
+                '_id': self.id
+            }, {
                 '$set': {
-                    'currentMediaPackage': media_package,
-                    'recording': True,
-                    'currentProfile': profile}})
+                    'currentMediaPackage': self.currentMediaPackage,
+                    'currentProfile': self.currentProfile,
+                    'recording': self.recording
+                }
+            })
 
     def on_stop_recording(self, sender=None):
+        self.recording = False
+        self.currentMediaPackage = None
+        self.currentProfile = None
         self.update(
             'rooms', {
-                '_id': self.id}, {
+                '_id': self.id
+            }, {
                 '$unset': {
-                    'currentMediaPackage': ''}, '$set': {
-                    'recording': False}})
+                    'currentMediaPackage': '',
+                    'currentProfile': ''
+                }, '$set': {
+                    'recording': self.recording
+                }
+            })
         self.update_images(1.5)
 
     def on_init(self, data):
@@ -264,37 +273,48 @@ class DDP(Thread):
     def on_subscribed(self, subscription):
         me = self.client.find_one('rooms')
         stream_key = uuid.uuid4().get_hex()
+
+        # Data to push when inserting or updating
+        data = {
+            'displayName': self.displayName,
+            'ip': self.ip,
+            'paused': self.paused,
+            'recording': self.recording,
+            'heartbeat': int(time.time()),
+            'camAvailable': self.cam_available,
+            'netregId': self.netreg_id,
+            'inputs': self.inputs(),
+            'stream': {
+                'port': self._audiostream_port,
+                'key': stream_key
+            }
+        }
+        if self.currentMediaPackage:
+            data['currentMediaPackage'] = self.currentMediaPackage
+        if self.currentProfile:
+            data['currentProfile'] = self.currentProfile
+
         if me:
-            self.update('rooms', {'_id': self.id}, {
-                '$set': {
-                    'displayName': self.displayName,
-                    'ip': self.ip,
-                    'paused': False,
-                    'recording': False,
-                    'heartbeat': int(time.time()),
-                    'camAvailable': self.cam_available,
-                    'netregId': self.netreg_id,
-                    'inputs': self.inputs(),
-                    'stream': {'port': self._audiostream_port,
-                               'key': stream_key}
-                }
-            })
+            # Items to unset
+            unset = {}
+            if not self.currentMediaPackage:
+                unset['currentMediaPackage'] = ''
+            if not self.currentProfile:
+                unset['currentProfile'] = ''
+
+            # Update to push
+            update = {
+                '$set': data
+            }
+
+            if unset:
+                update['$unset'] = unset
+            self.update('rooms', {'_id': self.id}, update)
         else:
             audio = self.read_audio_settings()
-            self.insert('rooms', {
-                '_id': self.id,
-                'displayName': self.displayName,
-                'audio': audio,
-                'ip': self.ip,
-                'paused': False,
-                'recording': False,
-                'heartbeat': int(time.time()),
-                'camAvailable': self.cam_available,
-                'netregId': self.netreg_id,
-                'inputs': self.inputs(),
-                'stream': {'port': self._audiostream_port,
-                           'key': stream_key}
-            })
+            data['_id'] = self.id
+            data['audio'] = audio
+            self.insert('rooms', data)
 
     def inputs(self):
         inputs = {
@@ -360,6 +380,16 @@ class DDP(Thread):
     def on_connected(self):
         logger.info('Connected to Meteor')
         self.client.login(self._user, self._password)
+
+    def on_logged_in(self, data):
+        try:
+            self.client.subscribe(
+                'GalicasterControl',
+                params=[
+                    self.id],
+                callback=self.subscription_callback)
+        except Exception:
+            logger.warn('DDP subscription failed')
 
     def on_closed(self, code, reason):
         self.has_disconnected = True
