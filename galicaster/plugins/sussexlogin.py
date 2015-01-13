@@ -35,12 +35,20 @@ from galicaster.classui import get_ui_path, get_image_path
 from galicaster.classui.elements.message_header import Header
 from galicaster.mediapackage.mediapackage import Mediapackage
 from operator import itemgetter
+from mav.mav import MAV
 
 #defaults 
-cam_available = True
+cam_available = 0
 cam_profile = 'cam'
 nocam_profile = 'nocam'
+camonly_profile = 'camonly'
+twocams_profile = 'twocams'
 fsize = 50
+matrix_ip = ''
+matrix_port = 2006
+matrix_retries = 5
+matrix_outs = [2, 3]
+matrix_cam_labels = ['Judges', 'Left', 'Right']
 
 sussex_login_dialog = None
 waiting_for_details = False
@@ -55,10 +63,13 @@ dispatcher = context.get_dispatcher()
 is_admin = conf.is_admin_blocked()
 
 
+mav = None
+
 def init():
     global timeout
-    global cam_available, cam_profile, nocam_profile
-    global fsize
+    global cam_available, cam_profile, nocam_profile, camonly_profile, twocams_profile
+    global matrix_ip, matrix_port, matrix_retries, matrix_outs, matrix_cam_labels
+    global fsize, mav
     try:
         dispatcher.connect('galicaster-status', event_change_mode)
         dispatcher.connect('restart-preview', show_login)
@@ -68,8 +79,13 @@ def init():
         pass
 
     cam_available = conf.get('sussexlogin', 'cam_available') or cam_available
-    cam_available = True if cam_available in ('True', 'true', True) else False
-    logger.info("cam_available set to: %r", cam_available)
+    if cam_available in ('True', 'true', True, '1', 1):
+      cam_available = 1
+    elif cam_available in ('False', 'false', False, '0', 0):
+      cam_available = 0
+    else:
+      cam_available = int(cam_available)
+    logger.info("cam_available set to: %d", cam_available)
         
     cam_profile = conf.get('sussexlogin', 'cam_profile') or cam_profile
     logger.info("cam_profile set to: %s", cam_profile)
@@ -83,6 +99,38 @@ def init():
 
     dispatcher.add_new_signal('sussexlogin-record', True)
     dispatcher.connect('sussexlogin-record', start_recording)
+
+    if cam_available > 1:
+      camonly_profile = conf.get('sussexlogin', 'camonly_profile') or camonly_profile
+      logger.info("camonly_profile set to: %s", camonly_profile)
+
+      twocams_profile = conf.get('sussexlogin', 'twocams_profile') or twocams_profile
+      logger.info("twocams_profile set to: %s", twocams_profile)
+
+      outs = conf.get('sussexlogin', 'matrix_outs')
+      if outs:
+        matrix_outs = outs.split(',')
+        matrix_outs = [int(x) for x in matrix_outs]
+      matrix_outs_str = ', '.join("%d" % m for m in matrix_outs)
+      logger.info("matrix_outs set to: [%s]", matrix_outs_str)
+
+      labels = conf.get('sussexlogin', 'matrix_cam_labels')
+      if labels:
+        matrix_cam_labels = [l.strip() for l in labels.split(',')]
+      logger.info("matrix_cam_labels set to: [%s]", ', '.join(matrix_cam_labels))
+
+      matrix_ip = conf.get('sussexlogin', 'matrix_ip') or matrix_ip
+      if matrix_ip:
+        logger.info("matrix_ip set to: %s", matrix_ip)
+
+      matrix_port = conf.get_int('sussexlogin', 'matrix_port') or matrix_port
+      logger.info("matrix_port set to: %d", matrix_port)
+
+      matrix_retries = conf.get_int('sussexlogin', 'matrix_retries') or matrix_retries
+      logger.info("matrix_retries set to: %d", matrix_retries)
+
+      mav = MAV(matrix_ip, matrix_port, matrix_retries)
+
 
 def event_change_mode(orig, old_state, new_state):
     """
@@ -117,7 +165,7 @@ def show_login(element=None):
         recorder_ui.get_object('recording1').set_text('Not recording')
         recorder_ui.get_object('recording3').set_text('')
         if cam_available:
-            switch_profile(cam_profile)
+            switch_profile(cam_profile, 1)
         elif (profile == cam_profile) or not cam_available:
             switch_profile(nocam_profile)
         sussex_login_dialog.login.set_text('')
@@ -251,9 +299,8 @@ class EnterDetails(gtk.Window):
         hbox2 = gtk.HBox()
         hbox3 = gtk.HBox()
 
-        liststore = liststore = gtk.ListStore(str,str)
-        self.liststore = liststore
-        liststore.append(['Choose a Module...', ''])
+        self.module_liststore = gtk.ListStore(str,str)
+        self.module_liststore.append(['Choose a Module...', ''])
         presenter = "Enter Details"
         photo = gtk.Image()
         
@@ -269,14 +316,14 @@ class EnterDetails(gtk.Window):
             if u['modules']:
                 #sort modules by name before adding to liststore
                 for series_id, series_name in sorted(u['modules'].items(), key=itemgetter(1)):
-                    liststore.append([series_name, series_id])
+                    self.module_liststore.append([series_name, series_id])
  
         strip = Header(size=(width, height), title=presenter)
         vbox.pack_start(strip, True, True, 0)
 
         cell = gtk.CellRendererText()
         cell.set_property('font-desc', fdesc)
-        self.module = gtk.ComboBox(liststore)
+        self.module = gtk.ComboBox(self.module_liststore)
         self.module.pack_start(cell, True)
         self.module.add_attribute(cell, 'text', 0)
         self.module.set_active(0)
@@ -285,12 +332,6 @@ class EnterDetails(gtk.Window):
         title.modify_font(fdesc)
         self.t = title
 
-        if cam_available:
-            cam = gtk.CheckButton(label='Camera')
-            cam.connect('clicked', self._toggled)
-            cam.child.set_attributes(attr)
-            self.cam = cam
-        
         rec_image = gtk.Image()
         icon = gtk.icon_theme_get_default().load_icon('media-record', 
                                                       int(fsize * 1.5), 
@@ -315,8 +356,38 @@ class EnterDetails(gtk.Window):
         cancel.child.set_padding(-1, int(fsize / 2.5))
 
         hbox2.pack_start(title)
-        if cam_available:
+        if cam_available == 1:
+            cam = gtk.CheckButton(label='Camera')
+            cam.connect('clicked', self._toggled)
+            cam.child.set_attributes(attr)
+            self.cam = cam
             hbox2.pack_start(cam, False, False, 5)
+        elif cam_available == 2:
+            self.cam1_liststore = gtk.ListStore(str,int)
+            self.cam1_liststore.append(['Presentation', -1])
+            for output, cam in enumerate(matrix_cam_labels):
+                self.cam1_liststore.append([cam, output + 1])
+            self.cam1 = gtk.ComboBox(self.cam1_liststore)
+            self.cam1.pack_start(cell, True)
+            self.cam1.add_attribute(cell, 'text', 0)
+            self.cam1.set_active(0)
+            self.cam1.set_wrap_width(1)
+            hbox2.pack_start(self.cam1, False, False, 5)
+            self.cam1.connect('changed', self._toggled)
+
+            self.cam2_liststore = gtk.ListStore(str,int)
+            self.cam2_liststore.append(['', -1])
+            for output, cam in enumerate(matrix_cam_labels):
+                self.cam2_liststore.append([cam, output + 1])
+            self.cam2 = gtk.ComboBox(self.cam2_liststore)
+            self.cam2.pack_start(cell, True)
+            self.cam2.add_attribute(cell, 'text', 0)
+            self.cam2.set_active(0)
+            self.cam2.set_wrap_width(1)
+            hbox2.pack_start(self.cam2, False, False, 5)
+            self.cam2.connect('changed', self._toggled)
+
+
         hbox3.pack_start(record, padding=5)
         hbox3.pack_start(cancel, padding=5)
         if u and u['modules']:
@@ -334,22 +405,47 @@ class EnterDetails(gtk.Window):
             switch_profile(nocam_profile)
 
     def _toggled(self, widget):
-        use_cam = widget.get_active()
-        profile = cam_profile if use_cam else nocam_profile
-        switch_profile(profile)
+        profile, cam1, cam2 = self.which_profile()
+        switch_profile(profile, cam1, cam2)
+
+    def which_profile(self):
+        profile = nocam_profile
+        if cam_available == 1:
+          profile = cam_profile if self.cam.get_active() else nocam_profile
+
+        if cam_available > 1:
+          cam1 = None
+          cam1_iter = self.cam1.get_active_iter()
+          if cam1_iter:
+            cam1 = self.cam1_liststore.get(cam1_iter, 0, 1)
+
+          cam2 = None
+          cam2_iter = self.cam2.get_active_iter()
+          if cam2_iter:
+            cam2 = self.cam2_liststore.get(cam2_iter, 0, 1)
+
+          if cam1[1] == -1:
+            profile = nocam_profile if cam2[1] == -1 else cam_profile
+          else:
+            profile = camonly_profile if cam2[1] == -1 else twocams_profile
+
+        if profile == cam_profile:
+          return profile, None, None
+
+        return profile, cam1[1], cam2[1]
         
     def do_record(self, button):
         global waiting_for_details
         mod = None
         iter = self.module.get_active_iter()
         if iter:
-            mod = self.liststore.get(iter, 0, 1)
+            mod = self.module_liststore.get(iter, 0, 1)
             # If no module selected, set module title to nothing.
             if mod[1] == '':
               mod = ('', '')
         name = self.t.get_text() or 'Unknown'
         cam = self.cam.get_active() if cam_available else False
-        profile = cam_profile if cam else nocam_profile
+        profile = self.which_profile()
         dispatcher.emit('sussexlogin-record', (self.u, name, mod, profile))
 
         waiting_for_details = False
@@ -432,7 +528,11 @@ def start_recording(orig, metadata):
     if ed:
       ed.hide()
 
-    switch_profile(profile)
+    if isinstance(profile, basestring):
+        switch_profile(profile)
+    else:
+        switch_profile(profile[0], profile[1], profile[2])
+
     repo = context.get_repository()
     if user:
         pres = user['user_name']
@@ -456,12 +556,24 @@ def start_recording(orig, metadata):
     else:
         dispatcher.emit('start-before', mp.getIdentifier())
 
-def switch_profile(profile):
+def switch_profile(profile, cam1=None, cam2=None):
     global switching_profile
     if not switching_profile:
         switching_profile = True
         conf.change_current_profile(profile)
         conf.update()
+        if mav:
+          if cam1 > 0:
+            try:
+              mav.tie(cam1, matrix_outs[0])
+            except:
+              pass
+          if cam2 > 0:
+            try:
+              mav.tie(cam2, matrix_outs[1])
+            except:
+              pass
+
         dispatcher.emit('reload-profile')
 
 def on_update_pipeline(source, old, new):
@@ -474,7 +586,7 @@ def on_update_pipeline(source, old, new):
         time.sleep(0.5)
         
         profile = conf.get('basic','profile')
-        if ed and cam_available:
+        if ed and cam_available == 1:
             ed.cam.set_active(profile == cam_profile)
         if not waiting_for_details:
             show_login()
