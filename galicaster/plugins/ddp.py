@@ -437,7 +437,8 @@ class DDP(Thread):
                 mixer.setmute(0)
             if audiofader['setlevel'] >= 0:
                 mixer.setvolume(audiofader['setlevel'], 0, audiofader['type'])
-                mixer.setvolume(audiofader['setlevel'], 1, audiofader['type'])
+                if 'Joined Playback Volume' not in mixer.volumecap():
+                    mixer.setvolume(audiofader['setlevel'], 1, audiofader['type'])
         return audio_settings
 
     def control_values(self, audiofader):
