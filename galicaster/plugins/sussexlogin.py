@@ -27,6 +27,7 @@
 import gst
 import gtk
 import pango
+import re
 import requests
 import time
 import xml.etree.ElementTree as ET
@@ -316,7 +317,7 @@ class EnterDetails(gtk.Window):
             if u['modules']:
                 #sort modules by name before adding to liststore
                 for series_id, series_name in sorted(u['modules'].items(), key=itemgetter(1)):
-                    self.module_liststore.append([series_name, series_id])
+                    self.module_liststore.append([series_name + ' (' + series_id.split('__')[0] + ')', series_id])
  
         strip = Header(size=(width, height), title=presenter)
         vbox.pack_start(strip, True, True, 0)
@@ -443,6 +444,11 @@ class EnterDetails(gtk.Window):
             # If no module selected, set module title to nothing.
             if mod[1] == '':
               mod = ('', '')
+            else:
+              code = mod[1].split('__')[0]
+              m = re.match('(.+)\W\(' + code + '\)', mod[0])
+              if m:
+                  mod = (m.group(1), mod[1])
         name = self.t.get_text() or 'Unknown'
         cam = self.cam.get_active() if cam_available else False
         profile = self.which_profile()
