@@ -27,7 +27,7 @@ pipestr = (' v4l2src name=gc-v4l2-src ! capsfilter name=gc-v4l2-filter ! queue !
            ' gc-v4l2-tee. ! queue ! valve drop=false name=gc-v4l2-valve ! ffmpegcolorspace ! queue ! '
            ' gc-v4l2-enc ! queue ! gc-v4l2-mux ! '
            ' queue ! filesink name=gc-v4l2-sink async=false'
-           ' gc-v4l2-tee. ! queue ! videorate ! videoscale ! video/x-raw-yuv, width=640, height=360, framerate=1/1 !'
+           ' gc-v4l2-tee. ! queue ! videorate ! videoscale ! capsfilter name=gc-v4l2-scaps !'
            ' jpegenc ! multifilesink name=gc-v4l2-thumbsink ')
 
 
@@ -64,6 +64,11 @@ class GCv4l2(gst.Bin, base.Base):
             "default": "image/jpeg,framerate=10/1,width=640,height=480", 
             # video/x-raw-yuv,framerate=25/1,width=1024,height=768", 
             "description": "Forced capabilities",
+            },
+        "screenshot_caps": {
+            "type": "caps",
+            "default": "video/x-raw-yuv,width=640, height=360, framerate=1/1",
+            "description": "Screenshot capabilities",
             },
         "videocrop-right": {
             "type": "integer",
@@ -141,6 +146,8 @@ class GCv4l2(gst.Bin, base.Base):
         if fr:            
             newcaps = 'video/x-raw-yuv,' + fr[0]
             self.set_value_in_pipeline(newcaps, 'gc-v4l2-vrate', 'caps', gst.Caps)
+
+        self.set_value_in_pipeline(self.options['screenshot_caps'], 'gc-v4l2-scaps', 'caps', gst.Caps)
 
         for pos in ['right','left','top','bottom']:
             self.set_option_in_pipeline('videocrop-'+pos, 'gc-v4l2-crop', pos, int)
