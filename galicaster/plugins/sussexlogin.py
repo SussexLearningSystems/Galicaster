@@ -446,7 +446,7 @@ class EnterDetails(gtk.Window):
               mod = ('', '')
             else:
               code = mod[1].split('__')[0]
-              m = re.match('(.+)\W\(' + code + '\)', mod[0])
+              m = re.match('(.+) \(' + code + '\)$', mod[0])
               if m:
                   mod = (m.group(1), mod[1])
         name = self.t.get_text() or 'Unknown'
