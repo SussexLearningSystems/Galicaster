@@ -334,14 +334,6 @@ class Repository(object):
     def __add(self, mp):
         self.__list[mp.getIdentifier()] = mp
 
-        # This makes sure the series gets properly included/removed from the manifest                                                                                                                              
-        # FIXME: Probably shouldn't go here                                                                                                                                                                        
-        catalogs = mp.getCatalogs("dublincore/series")
-        if mp.getSeriesIdentifier() and not catalogs:
-                mp.add(os.path.join(mp.getURI(), 'series.xml'), mediapackage.TYPE_CATALOG, 'dublincore/series', 'text/xml')
-        elif not mp.getSeriesIdentifier() and catalogs:
-            mp.remove(catalogs[0])
-            # FIXME: Remove the file from disk?                                                                                                                                                                     
         # Save the mediapackage in the repo
         serializer.save_in_dir(mp, self.logger)
         #FIXME write new XML metadata, episode, series                                                                                                                                                              
