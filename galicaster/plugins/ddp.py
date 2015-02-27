@@ -453,6 +453,4 @@ class DDP(Thread):
         return controls
 
     def subscribedTo(self, publication):
-        if self.client.subscriptions[publication]:
-            return True
-        return False
+        return self.client.subscriptions.get(publication) != None
