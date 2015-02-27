@@ -272,50 +272,51 @@ class DDP(Thread):
             logger.warn("Update callback returned error: %s" % error)
 
     def on_subscribed(self, subscription):
-        me = self.client.find_one('rooms')
-        stream_key = uuid.uuid4().get_hex()
+        if(subscription == 'GalicasterControl'):
+            me = self.client.find_one('rooms')
+            stream_key = uuid.uuid4().get_hex()
 
-        # Data to push when inserting or updating
-        data = {
-            'displayName': self.displayName,
-            'ip': self.ip,
-            'paused': self.paused,
-            'recording': self.recording,
-            'heartbeat': int(time.time()),
-            'camAvailable': self.cam_available,
-            'netregId': self.netreg_id,
-            'inputs': self.inputs(),
-            'stream': {
-                'port': self._audiostream_port,
-                'key': stream_key
+            # Data to push when inserting or updating
+            data = {
+                'displayName': self.displayName,
+                'ip': self.ip,
+                'paused': self.paused,
+                'recording': self.recording,
+                'heartbeat': int(time.time()),
+                'camAvailable': self.cam_available,
+                'netregId': self.netreg_id,
+                'inputs': self.inputs(),
+                'stream': {
+                    'port': self._audiostream_port,
+                    'key': stream_key
+                }
             }
-        }
-        if self.currentMediaPackage:
-            data['currentMediaPackage'] = self.currentMediaPackage
-        if self.currentProfile:
-            data['currentProfile'] = self.currentProfile
+            if self.currentMediaPackage:
+                data['currentMediaPackage'] = self.currentMediaPackage
+            if self.currentProfile:
+                data['currentProfile'] = self.currentProfile
 
-        if me:
-            # Items to unset
-            unset = {}
-            if not self.currentMediaPackage:
-                unset['currentMediaPackage'] = ''
-            if not self.currentProfile:
-                unset['currentProfile'] = ''
+            if me:
+                # Items to unset
+                unset = {}
+                if not self.currentMediaPackage:
+                    unset['currentMediaPackage'] = ''
+                if not self.currentProfile:
+                    unset['currentProfile'] = ''
 
-            # Update to push
-            update = {
-                '$set': data
-            }
+                # Update to push
+                update = {
+                    '$set': data
+                }
 
-            if unset:
-                update['$unset'] = unset
-            self.update('rooms', {'_id': self.id}, update)
-        else:
-            audio = self.read_audio_settings()
-            data['_id'] = self.id
-            data['audio'] = audio
-            self.insert('rooms', data)
+                if unset:
+                    update['$unset'] = unset
+                self.update('rooms', {'_id': self.id}, update)
+            else:
+                audio = self.read_audio_settings()
+                data['_id'] = self.id
+                data['audio'] = audio
+                self.insert('rooms', data)
 
     def inputs(self):
         inputs = {
