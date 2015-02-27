@@ -105,7 +105,7 @@ class DDP(Thread):
                 logger.warn('DDP connection failed')
 
     def update(self, collection, query, update):
-        if self.client.connected:
+        if self.client.connected and self.subscribedTo('GalicasterControl'):
             try:
                 self.client.update(
                     collection,
@@ -119,7 +119,7 @@ class DDP(Thread):
                     (collection, query, update))
 
     def insert(self, collection, document):
-        if self.client.connected:
+        if self.client.connected and self.subscribedTo('GalicasterControl'):
             try:
                 self.client.insert(
                     collection,
@@ -451,3 +451,8 @@ class DDP(Thread):
         controls['name'] = audiofader['name']
         controls['display'] = audiofader['display']
         return controls
+
+    def subscribedTo(self, publication):
+        if self.client.subscriptions[publication]:
+            return True
+        return False
