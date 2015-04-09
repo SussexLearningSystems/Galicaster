@@ -348,6 +348,11 @@ class DDP(Thread):
                     if level >= 0 and l != level:
                         mixer.setvolume(level, 0, fader['type'])
                         mixer.setvolume(level, 1, fader['type'])
+            """
+            Relies on /var/lib/alsa/asound.state(.lock) files being writeable
+            by current user
+            """
+            subprocess.call(['alsactl', 'store'])
 
     def on_added(self, collection, id, fields):
         self.set_audio(fields)
