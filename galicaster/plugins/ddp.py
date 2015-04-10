@@ -352,6 +352,9 @@ class DDP(Thread):
                         mixer.setvolume(level, 0, fader['type'])
                         mixer.setvolume(level, 1, fader['type'])
 
+            # Relies on no password sudo access for current user to alsactl
+            subprocess.call(['sudo', 'alsactl', 'store'])
+
     def on_added(self, collection, id, fields):
         self.set_audio(fields)
         self.update_audio()
