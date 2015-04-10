@@ -390,9 +390,12 @@ class DDP(Thread):
 
     def on_connected(self):
         logger.info('Connected to Meteor')
-        self.client.login(self._user, self._password)
+        token = conf.get('ddp', 'token')
+        self.client.login(self._user, self._password, token=token)
 
     def on_logged_in(self, data):
+        conf.set('ddp', 'token', data['token'])
+        conf.update()
         try:
             self.client.subscribe(
                 'GalicasterControl',
