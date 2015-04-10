@@ -45,6 +45,7 @@ class DDP(Thread):
         self.vu_min = -70
         self.vu_range = 40
         self.do_vu = 0
+        self.last_vu = None
         self.ip = socket.gethostbyname(socket.gethostname())
         self.id = conf.get('ingest', 'hostname')
         self._user = conf.get('ddp', 'user')
@@ -225,8 +226,10 @@ class DDP(Thread):
                 elif data > 0:
                     data = 0
             data = int(((data + self.vu_range) / float(self.vu_range)) * 100)
-            update = {'vumeter': data}
-            self.update('rooms', {'_id': self.id}, {'$set': update})
+            if data != self.last_vu:
+                update = {'vumeter': data}
+                self.update('rooms', {'_id': self.id}, {'$set': update})
+                self.last_vu = data
         self.do_vu = (self.do_vu + 1) % 20
 
     def on_rec_status_update(self, element, data):
