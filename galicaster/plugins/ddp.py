@@ -53,7 +53,7 @@ class DDP(Thread):
         self._http_host = conf.get('ddp', 'http_host')
         self._audiostream_port = conf.get('audiostream', 'port') or 31337
         self.netreg_id = conf.get('ddp', 'netreg_id')
-        self.store_audio = conf.get('ddp', 'store_audio')
+        self.store_audio = conf.get_boolean('ddp', 'store_audio')
         self.paused = False
         self.recording = False
         self.currentMediaPackage = None
