@@ -53,6 +53,7 @@ class DDP(Thread):
         self._http_host = conf.get('ddp', 'http_host')
         self._audiostream_port = conf.get('audiostream', 'port') or 31337
         self.netreg_id = conf.get('ddp', 'netreg_id')
+        self.store_audio = conf.get('ddp', 'store_audio')
         self.paused = False
         self.recording = False
         self.currentMediaPackage = None
@@ -351,9 +352,9 @@ class DDP(Thread):
                     if level >= 0 and l != level:
                         mixer.setvolume(level, 0, fader['type'])
                         mixer.setvolume(level, 1, fader['type'])
-
-            # Relies on no password sudo access for current user to alsactl
-            subprocess.call(['sudo', 'alsactl', 'store'])
+            if self.store_audio:
+                # Relies on no password sudo access for current user to alsactl
+                subprocess.call(['sudo', 'alsactl', 'store'])
 
     def on_added(self, collection, id, fields):
         self.set_audio(fields)
