@@ -448,7 +448,8 @@ class DDP(Thread):
             if audiofader['setlevel'] >= 0:
                 mixer.setvolume(audiofader['setlevel'], 0, audiofader['type'])
                 if 'Joined Playback Volume' not in mixer.volumecap():
-                    mixer.setvolume(audiofader['setlevel'], 1, audiofader['type'])
+                    mixer.setvolume(audiofader['setlevel'],
+                                    1, audiofader['type'])
         return audio_settings
 
     def control_values(self, audiofader):
@@ -463,4 +464,4 @@ class DDP(Thread):
         return controls
 
     def subscribedTo(self, publication):
-        return self.client.subscriptions.get(publication) != None
+        return self.client.subscriptions.get(publication) is not None
