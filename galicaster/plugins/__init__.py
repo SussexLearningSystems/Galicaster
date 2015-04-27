@@ -28,6 +28,6 @@ def init():
                 sys.modules[name].init()
                 logger.info('Plugin {0} started'.format(plugin))
             except Exception as e:
-                logger.error('Error starting plugin {0} ({1})'.format(plugin, e.message))
+                logger.error('Error starting plugin {0} ({1})'.format(plugin, e))
         else:
             logger.debug('Plugin {0} not enabled in conf'.format(plugin))
