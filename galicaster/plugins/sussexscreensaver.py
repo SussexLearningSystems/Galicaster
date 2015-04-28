@@ -60,6 +60,7 @@ def init():
     logger.debug('hourly_wake_minute set to %i', hourly_wake_minute)
 
     subprocess.call(['dconf', 'write', '/org/mate/desktop/session/idle-delay', '%i' % idle_delay]) 
+    wake_screen()
     dispatcher.connect('starting-record', inhibit)
     dispatcher.connect('restart-preview', uninhibit)
     dispatcher.connect('galicaster-notify-quit', uninhibit)
