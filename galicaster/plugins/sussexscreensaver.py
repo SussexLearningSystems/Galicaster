@@ -94,10 +94,10 @@ def uninhibit(signal=None):
 
 def pre_lecture_wake(signal=None):
     now = time.localtime()
-    if (hourly_wake and now.tm_hour >= hourly_wake_from
-            and now.tm_hour <= hourly_wake_to
-            and now.tm_min == hourly_wake_minute):
-            wake_screen()
+    if (hourly_wake and now.tm_hour >= hourly_wake_from and
+            now.tm_hour <= hourly_wake_to and
+            now.tm_min == hourly_wake_minute):
+        wake_screen()
 
 
 def wake_screen(signal=None):
