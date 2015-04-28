@@ -44,8 +44,8 @@ ss_uninhibit = screen_saver.get_dbus_method('UnInhibit')
 
 
 def init():
-    global idle_delay, hourly_wake, hourly_wake_from, hourly_wake_to,
-    hourly_wake_minute
+    global idle_delay
+    global hourly_wake, hourly_wake_from, hourly_wake_to, hourly_wake_minute
 
     idle_delay = conf.get_int('sussexscreensaver',
                               'idle_delay') or 20
