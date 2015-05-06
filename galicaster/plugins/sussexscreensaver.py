@@ -72,7 +72,7 @@ def init():
                      '%i' % idle_delay])
     subprocess.call(['dconf', 'write',
                      '/org/mate/power-manager/sleep-display-ac',
-                     '%i' % idle_delay * 60])
+                     '%i' % (idle_delay * 60)])
     wake_screen()
     dispatcher.connect('starting-record', inhibit)
     dispatcher.connect('restart-preview', uninhibit)
