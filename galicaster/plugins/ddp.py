@@ -13,6 +13,7 @@ import gobject
 from MeteorClient import MeteorClient
 import pyscreenshot as ImageGrab
 
+import galicaster
 from galicaster.core import context
 
 
@@ -293,7 +294,8 @@ class DDP(Thread):
                 'stream': {
                     'port': self._audiostream_port,
                     'key': stream_key
-                }
+                },
+                'galicasterVersion': galicaster.__version__
             }
             if self.currentMediaPackage:
                 data['currentMediaPackage'] = self.currentMediaPackage
