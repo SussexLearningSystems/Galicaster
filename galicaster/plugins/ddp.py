@@ -85,8 +85,12 @@ class DDP(Thread):
             audiofader['mute'] = conf.get_boolean(fader, 'mute')
             audiofader['unmute'] = conf.get_boolean(fader, 'unmute')
             audiofader['setlevel'] = conf.get_int(fader, 'setlevel')
-            audiofader['control'] = alsaaudio.Mixer(control=audiofader['name'])
-            self.audiofaders.append(audiofader)
+            try:
+                audiofader['control'] = alsaaudio.Mixer(
+                    control=audiofader['name'])
+                self.audiofaders.append(audiofader)
+            except Exception as e:
+                logger.warn(e)
         fd, eventmask = self.audiofaders[0]['control'].polldescriptors()[0]
         self.watchid = gobject.io_add_watch(fd, eventmask, self.mixer_changed)
 
