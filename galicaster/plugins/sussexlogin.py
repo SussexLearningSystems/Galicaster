@@ -450,7 +450,6 @@ class EnterDetails(gtk.Window):
               if m:
                   mod = (m.group(1), mod[1])
         name = self.t.get_text() or 'Unknown'
-        cam = self.cam.get_active() if cam_available else False
         profile = self.which_profile()
         dispatcher.emit('sussexlogin-record', (self.u, name, mod, profile))
 
