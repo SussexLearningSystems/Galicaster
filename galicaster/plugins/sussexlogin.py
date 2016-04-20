@@ -1,7 +1,7 @@
 # sussexlogin galicaster plugin
 #
 # Copyright 2013 University of Sussex
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
 # "Software"), to deal in the Software without restriction, including
@@ -9,10 +9,10 @@
 # distribute, sublicense, and/or sell copies of the Software, and to
 # permit persons to whom the Software is furnished to do so, subject to
 # the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be
 # included in all copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 # MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -38,7 +38,7 @@ from galicaster.mediapackage.mediapackage import Mediapackage
 from operator import itemgetter
 from mav.mav import MAV
 
-#defaults 
+#defaults
 cam_available = 0
 cam_profile = 'cam'
 nocam_profile = 'nocam'
@@ -75,7 +75,7 @@ def init():
         dispatcher.connect('galicaster-status', event_change_mode)
         dispatcher.connect('restart-preview', show_login)
         dispatcher.connect('update-pipeline-status', on_update_pipeline)
-        
+
     except ValueError:
         pass
 
@@ -87,7 +87,7 @@ def init():
     else:
       cam_available = int(cam_available)
     logger.info("cam_available set to: %d", cam_available)
-        
+
     cam_profile = conf.get('sussexlogin', 'cam_profile') or cam_profile
     logger.info("cam_profile set to: %s", cam_profile)
 
@@ -138,8 +138,8 @@ def event_change_mode(orig, old_state, new_state):
     On changing mode, if the new area is right, shows dialog if necessary
     """
     global sussex_login_dialog
-    
-    if new_state == 0: 
+
+    if new_state == 0:
         if not context.get_state().is_recording:
             show_login()
 
@@ -153,7 +153,7 @@ def show_login(element=None):
     """
     global sussex_login_dialog
     global waiting_for_details
-    if (not context.get_state().is_recording and 
+    if (not context.get_state().is_recording and
         not waiting_for_details and
         context.get_state().area == 0 and
         context.get_state().status == 'Preview'):
@@ -170,10 +170,10 @@ def show_login(element=None):
         elif (profile == cam_profile) or not cam_available:
             switch_profile(nocam_profile)
         sussex_login_dialog.login.set_text('')
-        sussex_login_dialog.show() 
+        sussex_login_dialog.show()
     return True
 
-   
+
 class LoginDialog(gtk.Dialog):
     def __init__(self):
         """
@@ -188,16 +188,16 @@ class LoginDialog(gtk.Dialog):
         self.set_modal(True)
         self.set_accept_focus(True)
         self.set_destroy_with_parent(True)
-    
+
         size = parent.get_size()
-        self.set_property('width-request',int(size[0]/3)) 
+        self.set_property('width-request',int(size[0]/3))
         if size[0] < 1300:
-            self.set_property('width-request',int(size[0]/2.3)) 
+            self.set_property('width-request',int(size[0]/2.3))
         wprop = size[0]/1920.0
         hprop = size[1]/1080.0
         self.set_position(gtk.WIN_POS_CENTER_ON_PARENT)
         self.action_area.set_layout(gtk.BUTTONBOX_SPREAD)
-    
+
         font = "%dpx" % (hprop * fsize)
         fdesc = pango.FontDescription(font)
         attr = set_font(font)
@@ -210,12 +210,12 @@ class LoginDialog(gtk.Dialog):
             child.set_property("width-request", int(wprop*170) )
             child.set_property("height-request", int(hprop*70) )
             child.set_can_focus(False)
-    
+
         #Taskbar with logo
         strip = Header(size=size, title="Log In")
         self.vbox.pack_start(strip, False, True, 0)
         strip.show()
-    
+
         #Labels
         label1 = gtk.Label("Username:")
         label1.modify_font(fdesc)
@@ -229,11 +229,11 @@ class LoginDialog(gtk.Dialog):
         login.activate()
         login.modify_font(fdesc)
         self.login = login
-        
+
         # Warning icon
         box = gtk.HBox(spacing=0) # between image and text
-        box.pack_start(label1, True, True, 0)  
-        box.pack_start(self.login, True, True, 0)  
+        box.pack_start(label1, True, True, 0)
+        box.pack_start(self.login, True, True, 0)
         box.show()
 
         self.action_area.set_property('spacing',int(hprop*20))
@@ -278,12 +278,12 @@ class EnterDetails(gtk.Window):
         global waiting_for_details
 
         parent = context.get_mainwindow()
-            
+
         self.par = parent
         width, height = parent.get_size()
-        self.wprop = width / 1920.0                                      
+        self.wprop = width / 1920.0
         self.hprop = height / 1080.0
-        
+
         font = '%dpx' % (self.wprop * fsize)
         fdesc = pango.FontDescription(font)
         attr = set_font(font)
@@ -304,21 +304,21 @@ class EnterDetails(gtk.Window):
         self.module_liststore.append(['Choose a Module...', ''])
         presenter = "Enter Details"
         photo = gtk.Image()
-        
-        self.u = None 
+
+        self.u = None
         u = get_user_details(user)
         if u:
             self.u = u
             presenter = u['user_name']
-             
+
             if u['pic']:
                 photo.set_from_pixbuf(u['pic'])
-             
+
             if u['modules']:
                 #sort modules by name before adding to liststore
                 for series_id, series_name in sorted(u['modules'].items(), key=itemgetter(1)):
                     self.module_liststore.append([series_name + ' (' + series_id.split('__')[0] + ')', series_id])
- 
+
         strip = Header(size=(width, height), title=presenter)
         vbox.pack_start(strip, True, True, 0)
 
@@ -334,8 +334,8 @@ class EnterDetails(gtk.Window):
         self.t = title
 
         rec_image = gtk.Image()
-        icon = gtk.icon_theme_get_default().load_icon('media-record', 
-                                                      int(fsize * 1.5), 
+        icon = gtk.icon_theme_get_default().load_icon('media-record',
+                                                      int(fsize * 1.5),
                                                       gtk.ICON_LOOKUP_FORCE_SVG)
         rec_image.set_from_pixbuf(icon)
         rec_image.set_alignment(1.0, 0.5)
@@ -346,11 +346,11 @@ class EnterDetails(gtk.Window):
         rec_hbox = gtk.HBox()
         rec_hbox.pack_start(rec_image)
         rec_hbox.pack_start(rec_label)
-        
+
         record = gtk.Button()
         record.connect('clicked', self.do_record)
         record.add(rec_hbox)
-        
+
         cancel = gtk.Button(label='Cancel')
         cancel.connect('clicked', self.do_cancel)
         cancel.child.set_attributes(attr)
@@ -397,7 +397,7 @@ class EnterDetails(gtk.Window):
         vbox2.pack_start(hbox3, padding=5)
         hbox.pack_start(photo, False, False, 5)
         hbox.pack_start(vbox2)
-        
+
         vbox.add(hbox)
         self.add(vbox)
         self.set_transient_for(parent)
@@ -427,14 +427,17 @@ class EnterDetails(gtk.Window):
 
           if cam1[1] == -1:
             profile = nocam_profile if cam2[1] == -1 else cam_profile
+          elif cam2[1] == -1:
+            profile = camonly_profile
+            cam2 = cam1
           else:
-            profile = camonly_profile if cam2[1] == -1 else twocams_profile
+            profile = twocams_profile
 
         if 0 <= cam_available <= 1:
           return profile, None, None
 
         return profile, cam1[1], cam2[1]
-        
+
     def do_record(self, button):
         global waiting_for_details
         mod = None
@@ -482,7 +485,7 @@ def get_user_details(user=None):
             r = requests.get(url)
         except requests.exceptions.RequestException:
             logger.error('Error getting data from web service')
-        
+
         try:
             xml = ET.fromstring(r.text)
             sub = xml.find('subtitle').text.split('/')
@@ -502,7 +505,7 @@ def get_user_details(user=None):
                         loader.close()
                         u['pic'] = loader.get_pixbuf()
                         break
-        
+
             u['modules'] = {}
             for row in xml.findall('row'):
                 row_temp = {}
@@ -510,12 +513,12 @@ def get_user_details(user=None):
                     row_temp[field.find('name').text] = field.find('value').text
                 mod_fullcode = row_temp['course_code'] + '__' + row_temp['occurrence_code']
                 u['modules'][mod_fullcode] = row_temp['module']
-            
+
         except Exception as e:
              logger.error('Looks like the web service XML is broken (or user name is invalid)')
 
         return u
-        
+
 def start_recording(orig, metadata):
     """
     start a recording by adding a mediapackage to the repo with the correct metadata
@@ -589,7 +592,7 @@ def on_update_pipeline(source, old, new):
             dispatcher.emit('start-before', trigger_recording)
             trigger_recording = None
         time.sleep(0.5)
-        
+
         profile = conf.get('basic','profile')
         if ed and cam_available == 1:
             ed.cam.set_active(profile == cam_profile)
@@ -604,7 +607,7 @@ class PlaceholderEntry(gtk.Entry):
 
     def __init__(self, *args, **kwargs):
         self.placeholder = kwargs['placeholder']
-        del kwargs['placeholder'] 
+        del kwargs['placeholder']
         gtk.Entry.__init__(self, *args, **kwargs)
         self.connect('focus-in-event', self._focus_in_event)
         self.connect('focus-out-event', self._focus_out_event)
