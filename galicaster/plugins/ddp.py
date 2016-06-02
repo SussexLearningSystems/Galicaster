@@ -47,7 +47,8 @@ class DDP(Thread):
         self.vu_range = 40
         self.do_vu = 0
         self.last_vu = None
-        self.ip = socket.gethostbyname(socket.gethostname())
+        self.hostname = socket.gethostname()
+        self.ip = socket.gethostbyname(self.hostname)
         self.id = conf.get('ingest', 'hostname')
         self._user = conf.get('ddp', 'user')
         self._password = conf.get('ddp', 'password')
@@ -289,6 +290,7 @@ class DDP(Thread):
             data = {
                 'displayName': self.displayName,
                 'ip': self.ip,
+                'hostname': self.hostname,
                 'paused': self.paused,
                 'recording': self.recording,
                 'heartbeat': int(time.time()),
