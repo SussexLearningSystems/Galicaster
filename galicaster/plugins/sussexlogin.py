@@ -199,9 +199,6 @@ class LoginDialog(gtk.Dialog):
         self.set_position(gtk.WIN_POS_CENTER_ON_PARENT)
         self.action_area.set_layout(gtk.BUTTONBOX_SPREAD)
 
-        posx, posy = self.get_position()
-        self.move(posx, posy-180)
-
         font = "%dpx" % (hprop * fsize)
         fdesc = pango.FontDescription(font)
         attr = set_font(font)
@@ -271,6 +268,12 @@ class LoginDialog(gtk.Dialog):
         # listen for key presses
         self.add_events(gtk.gdk.KEY_PRESS_MASK)
         self.connect('key-press-event', self.eat_escape)
+
+        # Move dialog to 50px above top of maliit keyboard display on screen
+        available_headroom = size[1] - 264
+        dialog_size = self.get_size()
+        posx, posy = self.get_position()
+        self.move(posx, available_headroom - (dialog_size[1] + 50))
 
     def _focus_in_event(self, widget, event):
         self.continuous_bg.hide()
