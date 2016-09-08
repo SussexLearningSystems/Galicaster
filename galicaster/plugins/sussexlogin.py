@@ -286,12 +286,18 @@ class LoginDialog(gtk.Dialog):
             waiting_for_details = False
             show_login(flash=flash_messages['empty_username'])
         else:
-            user = get_user_details(username)
-            if user:
-                ed = EnterDetails(user)
-            else:
-                waiting_for_details = False
-                show_login(flash=flash_messages['user_not_found'].format(username))
+            try:
+                user = get_user_details(username)
+                if user:
+                    ed = EnterDetails(user)
+                else:
+                    waiting_for_details = False
+                    show_login(flash=flash_messages['user_not_found'].format(username))
+            except Exception as e:
+                if e.message is flash_messages['webservice_unavailable']:
+                    user = {}
+                    logger.warn('Allowing anonymous recording as web service unavailable')
+                    ed = EnterDetails(user)
 
     # ignore escape presses
     def eat_escape(self, widget, event):
@@ -509,6 +515,7 @@ def get_user_details(user=None):
     """
     look up user info/courses in web service
     """
+    global flash_messages
     if user:
         u = {}
         try:
@@ -529,6 +536,7 @@ def get_user_details(user=None):
             r = requests.get(url, timeout=ws_timeout)
         except requests.exceptions.RequestException:
             logger.error('Error getting data from web service')
+            raise Exception(flash_messages['webservice_unavailable'])
 
         try:
             xml = ET.fromstring(r.text)
