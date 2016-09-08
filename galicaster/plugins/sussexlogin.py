@@ -250,6 +250,7 @@ class LoginDialog(gtk.Dialog):
         self.continuous_bg.show()
 
         table = gtk.Table(2, 2, False)
+        table.set_row_spacings(5)
         table.attach(label, 0, 1, 0, 1, xoptions=gtk.SHRINK)
         table.attach(self.entry, 1, 2, 0, 1, xoptions=gtk.EXPAND|gtk.FILL)
         table.attach(login_button, 1, 2, 1, 2, xoptions=gtk.EXPAND|gtk.FILL)
