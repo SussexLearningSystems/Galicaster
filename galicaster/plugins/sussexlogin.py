@@ -519,7 +519,13 @@ def get_user_details(user=None):
             logger.error('No web service url specified in config')
 
         try:
-            r = requests.get(url)
+            ws_timeout = int(conf.get('sussexlogin', 'ws_timeout'))
+        except:
+            ws_timeout = 5
+            logger.error('No value or invalid timeout specified for web service request, defaulting to {}'.format(ws_timeout))
+
+        try:
+            r = requests.get(url, timeout=ws_timeout)
         except requests.exceptions.RequestException:
             logger.error('Error getting data from web service')
 
