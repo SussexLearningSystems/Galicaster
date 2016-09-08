@@ -285,22 +285,34 @@ class LoginDialog(gtk.Dialog):
         global ed, flash_messages, waiting_for_details
         self.hide()
         username = self.entry.get_text()
-        if not username:
-            waiting_for_details = False
-            show_login(flash=flash_messages['empty_username'])
+
+        force_login = conf.get_boolean('sussexlogin', 'force_login') or False
+        if force_login:
+            if not username:
+                waiting_for_details = False
+                show_login(flash=flash_messages['empty_username'])
+            else:
+                try:
+                    user = get_user_details(username)
+                    if user:
+                        ed = EnterDetails(user)
+                    else:
+                        waiting_for_details = False
+                        show_login(flash=flash_messages['user_not_found'].format(username))
+                except Exception as e:
+                    if e.message is flash_messages['webservice_unavailable']:
+                        user = {}
+                        logger.warn('Allowing anonymous recording as web service unavailable')
+                        ed = EnterDetails(user)
         else:
             try:
                 user = get_user_details(username)
-                if user:
-                    ed = EnterDetails(user)
-                else:
-                    waiting_for_details = False
-                    show_login(flash=flash_messages['user_not_found'].format(username))
             except Exception as e:
                 if e.message is flash_messages['webservice_unavailable']:
                     user = {}
                     logger.warn('Allowing anonymous recording as web service unavailable')
-                    ed = EnterDetails(user)
+            finally:
+                ed = EnterDetails(user)
 
     # ignore escape presses
     def eat_escape(self, widget, event):
