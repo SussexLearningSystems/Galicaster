@@ -65,6 +65,11 @@ is_admin = conf.is_admin_blocked()
 
 
 mav = None
+flash_messages = {
+    'empty_username': "Please enter a username",
+    'user_not_found': "Username does not exist\nPlease enter a valid username",
+    'webservice_unavailable': "Unable to verify user.\nPlease contact IT Services"
+}
 
 def init():
     global timeout
@@ -147,7 +152,7 @@ def event_change_mode(orig, old_state, new_state):
         sussex_login_dialog.hide()
 
 
-def show_login(element=None):
+def show_login(element=None, flash=None):
     """
     Called up when switching to record mode or recording ended, shows the dialog if necessary
     """
@@ -157,10 +162,7 @@ def show_login(element=None):
         not waiting_for_details and
         context.get_state().area == 0 and
         context.get_state().status == 'Preview'):
-        if sussex_login_dialog:
-            pass
-        else:
-            sussex_login_dialog = LoginDialog()
+        sussex_login_dialog = LoginDialog(flash)
         waiting_for_details = True
         recorder_ui = context.get_mainwindow().nbox.get_nth_page(0).gui
         recorder_ui.get_object('recording1').set_text('Not recording')
@@ -169,13 +171,12 @@ def show_login(element=None):
             switch_profile(cam_profile, 1)
         elif (profile == cam_profile) or not cam_available:
             switch_profile(nocam_profile)
-        sussex_login_dialog.login.set_text('')
         sussex_login_dialog.show()
     return True
 
 
 class LoginDialog(gtk.Dialog):
-    def __init__(self):
+    def __init__(self, flash_str):
         """
         Creates the Sussex Login interface
         """
@@ -198,18 +199,12 @@ class LoginDialog(gtk.Dialog):
         self.set_position(gtk.WIN_POS_CENTER_ON_PARENT)
         self.action_area.set_layout(gtk.BUTTONBOX_SPREAD)
 
+        posx, posy = self.get_position()
+        self.move(posx, posy-180)
+
         font = "%dpx" % (hprop * fsize)
         fdesc = pango.FontDescription(font)
         attr = set_font(font)
-
-        #Buttons
-        login_button = self.add_button("Log In",2)
-        login_button.child.set_attributes(attr)
-        login_button.connect("clicked", self.do_login)
-        for child in self.action_area.get_children():
-            child.set_property("width-request", int(wprop*170) )
-            child.set_property("height-request", int(hprop*70) )
-            child.set_can_focus(False)
 
         #Taskbar with logo
         strip = Header(size=size, title="Log In")
@@ -217,43 +212,85 @@ class LoginDialog(gtk.Dialog):
         strip.show()
 
         #Labels
-        label1 = gtk.Label("Username:")
-        label1.modify_font(fdesc)
-        label1.set_alignment(0.5,0.5)
+        label = gtk.Label("Username:")
+        label.modify_font(fdesc)
+        label.show()
 
-        login = gtk.Entry()
-        login.set_editable(gtk.TRUE)
-        login.set_can_focus(gtk.TRUE)
-        login.set_activates_default(gtk.TRUE)
-        login.set_text('')
-        login.activate()
-        login.modify_font(fdesc)
-        self.login = login
+        self.entry = gtk.Entry()
+        self.entry.connect('activate', self.do_login)
+        self.entry.modify_font(fdesc)
+        self.entry.connect('focus-in-event', self._focus_in_event)
+        self.entry.show()
 
-        # Warning icon
-        box = gtk.HBox(spacing=0) # between image and text
-        box.pack_start(label1, True, True, 0)
-        box.pack_start(self.login, True, True, 0)
-        box.show()
+        login_button = gtk.Button('Log In')
+        login_button.connect('clicked', self.do_login)
+        login_button.modify_font(fdesc)
+        login_button.child.set_attributes(attr)
+        login_button.show()
 
-        self.action_area.set_property('spacing',int(hprop*20))
-        self.vbox.pack_start(box, True, False, 0)
+        flash_label = gtk.Label(flash_str)
+        flash_label.modify_font(fdesc)
+        flash_label.set_alignment(0, 0)
+        flash_label.set_line_wrap(True)
+        flash_label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse('#a94442'))
+        flash_label.show()
 
-        self.vbox.set_child_packing(self.action_area, True, True, int(hprop*25), gtk.PACK_END)
-        self.login.show()
-        label1.show()
+        flash_bg = gtk.EventBox()
+        flash_bg.add(flash_label)
+        flash_bg.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse('#ebccd1'))
+        flash_bg.show()
+
+        spacer = gtk.HBox()
+        spacer.pack_start(flash_bg, False, False, 10)
+        spacer.show()
+
+        self.continuous_bg = gtk.EventBox()
+        self.continuous_bg.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse('#ebccd1'))
+        self.continuous_bg.add(spacer)
+        self.continuous_bg.show()
+
+        table = gtk.Table(2, 2, False)
+        table.attach(label, 0, 1, 0, 1, xoptions=gtk.SHRINK)
+        table.attach(self.entry, 1, 2, 0, 1, xoptions=gtk.EXPAND|gtk.FILL)
+        table.attach(login_button, 1, 2, 1, 2, xoptions=gtk.EXPAND|gtk.FILL)
+        table.show()
+
+        self.table_box = gtk.HBox()
+        self.table_box.pack_start(table, True, True, 10)
+        self.table_box.show()
+
+        vbox = gtk.VBox()
+        if flash_str:
+            vbox.pack_start(self.continuous_bg, False, False, 10)
+        vbox.pack_start(self.table_box, False, False, 0)
+        vbox.show()
+
+        self.vbox.add(vbox)
 
         # listen for key presses
         self.add_events(gtk.gdk.KEY_PRESS_MASK)
         self.connect('key-press-event', self.eat_escape)
 
+    def _focus_in_event(self, widget, event):
+        self.continuous_bg.hide()
+
     def do_login(self, button):
         """
         Called when you press the login button
         """
-        global ed
+        global ed, flash_messages, waiting_for_details
         self.hide()
-        ed = EnterDetails(self.login.get_text())
+        username = self.entry.get_text()
+        if not username:
+            waiting_for_details = False
+            show_login(flash=flash_messages['empty_username'])
+        else:
+            user = get_user_details(username)
+            if user:
+                ed = EnterDetails(user)
+            else:
+                waiting_for_details = False
+                show_login(flash=flash_messages['user_not_found'].format(username))
 
     # ignore escape presses
     def eat_escape(self, widget, event):
@@ -273,7 +310,7 @@ class EnterDetails(gtk.Window):
     """
     __gtype_name__ = 'EnterDetails'
 
-    def __init__(self, user=''):
+    def __init__(self, user=None):
         gtk.Window.__init__(self)
         global waiting_for_details
 
@@ -306,7 +343,7 @@ class EnterDetails(gtk.Window):
         photo = gtk.Image()
 
         self.u = None
-        u = get_user_details(user)
+        u = user
         if u:
             self.u = u
             presenter = u['user_name']
