@@ -287,6 +287,7 @@ class LoginDialog(gtk.Dialog):
         username = self.entry.get_text()
 
         force_login = conf.get_boolean('sussexlogin', 'force_login') or False
+        logger.info("Force login set to: {}".format(force_login))
         if force_login:
             if not username:
                 waiting_for_details = False
