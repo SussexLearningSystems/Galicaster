@@ -236,7 +236,7 @@ class Worker(object):
         """
         self.logger.info("Set nightly operation {} for MP {}".format(operation, mp.getIdentifier()))
         mp.setOpStatus(operation,mediapackage.OP_NIGHTLY)
-        mp.setProperty("enqueue_params", json.dumps(params))
+        mp.setProperty("enqueue_params", params)
         self.repo.update(mp)
         self.dispatcher.emit('action-mm-refresh-row', mp.identifier)
 
@@ -316,6 +316,8 @@ class Worker(object):
 
         ifile = tempfile.NamedTemporaryFile(dir=self.tmp_path)
         self._export_to_zip(mp, params={"location" : ifile, "is_action": False})
+
+        print 'workflow:', workflow
 
         if mp.manual:
             self.oc_client.ingest(ifile.name, mp.getIdentifier(), workflow=workflow, workflow_instance=None, workflow_parameters=workflow_parameters)
@@ -501,7 +503,5 @@ class Worker(object):
         for mp in self.repo.values():
             for (op_name, op_status) in mp.operation.iteritems():
                 if op_status == mediapackage.OP_NIGHTLY:
-                    params = {}
-                    if mp.getProperty("enqueue_params"):
-                        params = json.loads(mp.getProperty("enqueue_params"))
+                    params = mp.getProperty("enqueue_params") or {}
                     self.enqueue_job_by_name(op_name, mp, params)
