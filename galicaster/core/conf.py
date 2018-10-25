@@ -969,6 +969,19 @@ class Profile(object):
 
         return audio_tracks
 
+    def get_video_tracks(self, flavor=None):
+        """
+        Return tracks containing video, optionally filtered by flavor e.g. presentation or presenter
+        """
+        video_tracks = []
+        for track in self.tracks:
+            if 'videosink' in track.options_keys():
+                if not flavor:
+                    video_tracks.append(track)
+                elif track.get('flavor') == flavor:
+                    video_tracks.append(track)
+        return video_tracks
+
     #TODO error, be careful with self.tracks(. It's not a method
     def reorder_tracks(self, order=[]):
         """Reorders the tracks following the order set by the argument order.
