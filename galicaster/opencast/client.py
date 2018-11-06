@@ -212,7 +212,7 @@ class OCHTTPClient(object):
         """
         Los posibles estados son: shutting_down, capturing, uploading, unknown, idle
         """
-        self.logger and self.logger.info("Sending state {}".format(state))
+        self.logger and self.logger.debug("Sending state {}".format(state))
         return self.__call('POST', SETSTATE_ENDPOINT, {'hostname': self.hostname},
                            postfield={'address': self.address, 'state': state})
 

@@ -218,7 +218,7 @@ class OCService(object):
             self.ca_status = 'capturing'
         else:
             self.ca_status = 'idle'
-        self.logger.info('Set status %s to server', self.ca_status)
+        self.logger.debug('Set status %s to server', self.ca_status)
 
         try:
             self.client.setstate(self.ca_status)
@@ -232,7 +232,7 @@ class OCService(object):
     def process_ical(self):
         """Creates, deletes or updates mediapackages according to scheduled events information given by opencast.
         """
-        self.logger.info('Process ical')
+        self.logger.debug('Process ical')
         try:
             ical_data1 = self.client.ical()
         except Exception as exc:
