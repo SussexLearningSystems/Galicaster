@@ -172,11 +172,11 @@ class OCService(object):
 
 
     def update_series(self):
-        self.logger.info('Updating series from server')
+        self.logger.debug('Updating series from server')
         self.series = get_series()
 
     def update_conf(self):
-        self.logger.info('Setting CA configuration to server')
+        self.logger.debug('Setting CA configuration to server')
         try:
             self.client.setconfiguration(self.conf.get_tracks_in_oc_dict())
             self.__set_opencast_up()

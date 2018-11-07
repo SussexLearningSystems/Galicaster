@@ -199,12 +199,12 @@ class OCHTTPClient(object):
 
         if self.response['Status-Code'] == 304:
             if self.logger:
-                self.logger.info("iCal Not modified")
+                self.logger.debug("iCal Not modified")
             return None
 
         self.ical_etag = self.response['ETag']
         if self.logger:
-                self.logger.info("iCal modified")
+                self.logger.debug("iCal modified")
         return icalendar
 
 
